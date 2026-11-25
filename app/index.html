@@ -129,6 +129,11 @@
   .ev-row{cursor:pointer}
   .ev-row:hover td{background:#fafcfc}
   .ev-row .t{font-weight:600}
+  /* 已結束的活動：底色變灰 */
+  .ev-row.ended td, .ev-row.ended:hover td{background:#eef1f3;color:var(--muted)}
+  .ev-row.ended .chip, .card.ended .chip{opacity:.6}
+  .card.ended{background:#eef1f3;box-shadow:none}
+  .card.ended h3, .card.ended .price{color:var(--muted)}
   .mg-row td{background:#f3f6f7;font-weight:700;font-size:14px;color:var(--ink-2);padding:9px 14px}
   .mine-tag{font-size:12px;font-weight:700;color:var(--ok);margin-top:4px}
   @media (max-width:819px){
@@ -137,6 +142,7 @@
     .ev-table thead{display:none}
     .ev-row{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"date status" "main main" "cat cat" "prog prog";gap:6px 10px;padding:12px 14px;border-bottom:1px solid var(--line)}
     .ev-row td{display:block;padding:0;border:0;background:transparent!important}
+    .ev-row.ended{background:#eef1f3}
     .c-date{grid-area:date} .c-main{grid-area:main} .c-cat{grid-area:cat} .c-prog{grid-area:prog} .c-status{grid-area:status;text-align:right}
     .c-date .sub{display:inline;margin-left:6px}
     .mg-row{display:block} .mg-row td{display:block}
@@ -550,7 +556,7 @@ const monthName = (y, m)=> y === TODAY.getFullYear() ? `${m+1}月` : `${y}年 ${
 
 function rowHtml(ev){
   const i=info(ev), c=CATS[ev.cat];
-  return `<tr class="ev-row" data-open="${ev.id}">
+  return `<tr class="ev-row${i.ended ? ' ended' : ''}" data-open="${ev.id}">
       <td class="c-date">${fmtDate(ev.date)}<div class="sub">${esc(ev.time)}</div></td>
       <td class="c-main"><div class="t">${esc(ev.title)}</div><div class="sub">${money(ev.price)}・${esc(ev.host)}</div></td>
       <td class="c-cat"><span class="chip" style="background:${c.color}">${c.name}</span></td>
@@ -562,7 +568,7 @@ function cardHtml(ev){
   const i=info(ev), c=CATS[ev.cat];
   const faces = ev.signups.slice(0,7).map(s=>av(s.nick)).join('');
   const more = ev.signups.length>7 ? `+${ev.signups.length-7}` : '';
-  return `<button class="card" data-open="${ev.id}">
+  return `<button class="card${i.ended ? ' ended' : ''}" data-open="${ev.id}">
       <div class="card-body">
         <div class="meta-row"><span class="chip" style="background:${c.color}">${c.name}</span><span class="date">${fmtDate(ev.date)} ${esc(ev.time)}</span></div>
         <h3>${esc(ev.title)}</h3>
