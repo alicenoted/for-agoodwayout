@@ -11,6 +11,8 @@
 | 分享到 LINE 社群（在 LINE 裡打開會自動登入） | https://liff.line.me/2012620335-Hk2HkkYY |
 | 網站本身（一般瀏覽器、管理員用電腦操作） | https://alicenoted-coder.github.io/for-agoodwayout/app/ |
 | 介面原型（不需登入，資料只存在自己的瀏覽器） | https://alicenoted-coder.github.io/for-agoodwayout/prototype/stage1_v2.html |
+| 體驗模式・社員頁（假資料，不需 LINE） | https://alicenoted-coder.github.io/for-agoodwayout/demo/member/ |
+| 體驗模式・管理員頁（假資料，不需 LINE） | https://alicenoted-coder.github.io/for-agoodwayout/demo/admin/ |
 
 > LINE 登入目前是「開發中」狀態，只有管理員和測試者能登入。
 
@@ -54,11 +56,13 @@ LINE（LIFF 自動登入）
 | `app/` | 正式網頁 |
 | `supabase/migrations/` | 資料表與權限設定 |
 | `supabase/functions/api/` | 後端 API |
+| `demo/` | 體驗模式：`member/`、`admin/` 兩頁＋假後端 `demo-backend.js`（由 `tools/build_demo.py` 從 `app/` 產生） |
 | `prototype/` | 介面原型 |
 | `docs/DEVELOPMENT.md` | 開發紀錄：決定、設定值、API、進度（**接手前請先讀**） |
 
 ## 開發
 
+- 改了 `app/index.html` 之後，執行 `python3 tools/build_demo.py` 重新產生體驗模式的兩頁。
 - 網頁是單一 HTML 檔，不需要編譯；推上 `claude/dazzling-bell-q1quxi` 分支後，GitHub Pages 約 1～2 分鐘內更新。
 - 資料表變更：在 `supabase/migrations/` 新增 SQL 檔，再套用到 Supabase 專案。
 - 後端變更：修改 `supabase/functions/api/index.ts` 後重新部署 Edge Function `api`（`verify_jwt` 維持關閉，由函式自己驗證 LINE 身分）。

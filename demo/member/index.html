@@ -1,0 +1,929 @@
+<!doctype html>
+<!-- 這個檔案由 tools/build_demo.py 從 app/index.html 自動產生，請勿直接修改 -->
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>出走社活動接龍（體驗・社員）</title>
+<style>
+  :root{
+    --bg:#f6f8f7; --surface:#ffffff; --ink:#18364b; --ink-2:#29475b; --muted:#607789;
+    --line:#dfe7ea; --soft:#edf3f5;
+    --brand:#2f6f7e; --brand-ink:#ffffff; --accent:#b18c4d;
+    --c-host:#2f6f7e; --c-select:#a67c35; --c-member:#4f8250; --c-social:#c0634d;
+    --ok:#3d8a5a; --ok-soft:#e5f3ea; --warn:#b07a1f; --warn-soft:#fbf1df; --danger:#b5483a;
+    --radius:16px; --shadow:0 3px 14px rgba(23,50,77,.08);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:var(--bg);color:var(--ink);font:15px/1.6 -apple-system,BlinkMacSystemFont,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;-webkit-font-smoothing:antialiased}
+  button,input,select,textarea{font:inherit;color:inherit}
+  button{cursor:pointer}
+  .wrap{max-width:1040px;margin:0 auto;padding:0 16px}
+  .hidden{display:none!important}
+
+  /* top bar */
+  .top{position:sticky;top:0;z-index:20;background:rgba(246,248,247,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+  .top .wrap{display:flex;align-items:center;gap:12px;height:58px}
+  .logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:17px;letter-spacing:.02em}
+  .logo-mark{width:32px;height:32px;border-radius:10px;background:var(--ink);color:#fff;display:grid;place-items:center;font-size:15px}
+  .logo small{display:block;font-weight:500;font-size:11px;color:var(--muted);letter-spacing:.06em;line-height:1.1}
+  .spacer{flex:1}
+  @media (max-width:420px){.logo small{display:none}}
+  .mode{display:flex;background:var(--soft);border-radius:999px;padding:3px}
+  .mode button{white-space:nowrap;border:0;background:transparent;padding:5px 12px;border-radius:999px;font-size:13px;color:var(--muted)}
+  .mode button.on{background:var(--surface);color:var(--ink);font-weight:600;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:0;border-radius:12px;padding:11px 18px;font-weight:600;background:var(--brand);color:var(--brand-ink);text-decoration:none;transition:filter .15s}
+  .btn:hover{filter:brightness(1.08)}
+  .btn:disabled{opacity:.45;cursor:not-allowed;filter:none}
+  .btn.block{width:100%}
+  .btn.line{background:#06c755;color:#fff}
+  .btn.ghost{background:transparent;color:var(--ink-2);border:1.5px solid var(--line)}
+  .btn.gold{background:var(--accent)}
+  .btn.danger{background:transparent;color:var(--danger);border:1.5px solid #ecc9c3}
+  .btn.sm{padding:7px 12px;font-size:13px;border-radius:10px}
+  .or{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:13px;margin:18px 0}
+  .or::before,.or::after{content:"";flex:1;height:1px;background:var(--line)}
+  .field{display:block;text-align:left;margin-bottom:14px}
+  .field > span{display:block;font-size:13px;font-weight:600;color:var(--ink-2);margin-bottom:5px}
+  .field em{font-style:normal;color:var(--muted);font-weight:400}
+  .input{width:100%;border:1.5px solid var(--line);border-radius:12px;padding:10px 12px;background:#fff;outline:none}
+  .input:focus{border-color:var(--brand)}
+  .hint{font-size:12px;color:var(--muted);margin-top:10px}
+  .err{color:var(--danger);font-size:13px;min-height:20px;text-align:left}
+
+  /* hero */
+  .hero{padding:24px 0 8px;display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px}
+  .hero h1{margin:0;font-size:26px;line-height:1.3}
+  .hero p{margin:4px 0 0;color:var(--muted)}
+  .month{display:inline-flex;align-items:center;gap:4px;background:var(--surface);border-radius:12px;padding:4px;box-shadow:var(--shadow);margin-bottom:12px}
+  .month button{border:0;background:transparent;width:32px;height:32px;border-radius:9px;font-size:16px;color:var(--ink-2)}
+  .month button:hover{background:var(--soft)}
+  .month b{min-width:96px;text-align:center;font-size:14px}
+
+  /* layout: calendar + cards */
+  .layout{display:grid;grid-template-columns:1fr;gap:16px;padding:12px 0 40px}
+  @media (min-width:820px){.layout{grid-template-columns:270px 1fr;gap:24px}.side{position:sticky;top:122px;align-self:start}}
+  .cal{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);padding:14px 12px 12px}
+  @media (max-width:819px){.cal{max-width:420px}.cal-day{aspect-ratio:auto;height:40px}}
+  .cal-week,.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center}
+  .cal-week span{font-size:12px;color:var(--muted);padding-bottom:6px}
+  .cal-week span:first-child,.cal-week span:last-child{color:#c0634d}
+  .cal-day{aspect-ratio:1/1;border:0;background:transparent;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:13px;color:#b3c0c9;padding:0}
+  .cal-day.blank{visibility:hidden}
+  .cal-day.has{color:var(--ink);font-weight:700;cursor:pointer}
+  .cal-day.has:hover{background:var(--soft)}
+  .cal-day:disabled{cursor:default}
+  .cal-day.today{box-shadow:inset 0 0 0 1.5px var(--brand)}
+  .cal-day.sel{background:var(--ink);color:#fff}
+  .cal-day.sel:hover{background:var(--ink)}
+  .dots{display:flex;gap:2px;height:5px}
+  .dots i{width:5px;height:5px;border-radius:50%}
+  .cal-day.sel .dots i{box-shadow:0 0 0 1px #fff}
+  .cal-foot{font-size:12px;color:var(--muted);margin-top:8px;padding:8px 4px 0;border-top:1px solid var(--line)}
+  .day-bar{display:flex;align-items:center;gap:10px;background:var(--surface);border-radius:12px;padding:8px 8px 8px 14px;box-shadow:var(--shadow);margin-bottom:14px;font-size:14px}
+  .day-bar b{flex:1}
+
+  .howto{margin:16px 0 4px;background:linear-gradient(120deg,#e8f2f4,#f8f0e5);border-radius:var(--radius);padding:14px 16px;position:relative}
+  .howto h3{margin:0 0 8px;font-size:15px}
+  .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .step{background:rgba(255,255,255,.75);border-radius:12px;padding:10px;font-size:13px;line-height:1.45}
+  .step b{display:block;font-size:14px;margin-bottom:2px}
+  .step i{font-style:normal;display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:var(--ink);color:#fff;font-size:12px;margin-right:4px}
+  .howto .x{position:absolute;top:8px;right:8px;border:0;background:transparent;color:var(--muted);font-size:18px;width:30px;height:30px;border-radius:8px}
+  @media (max-width:560px){.steps{grid-template-columns:1fr}}
+
+
+  .tabs{display:flex;gap:8px;overflow-x:auto;padding:14px 0 6px;scrollbar-width:none;position:sticky;top:58px;background:var(--bg);z-index:5}
+  .tabs::-webkit-scrollbar{display:none}
+  .tab{flex:none;border:1.5px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 14px;font-size:14px;color:var(--ink-2);display:flex;align-items:center;gap:6px}
+  .tab .dot{width:8px;height:8px;border-radius:50%}
+  .tab .n{font-size:12px;color:var(--muted)}
+  .tab.on{background:var(--ink);border-color:var(--ink);color:#fff}
+  .tab.on .n{color:#c9d6df}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,280px),1fr));gap:14px}
+  .card{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column;cursor:pointer;border:0;text-align:left;padding:0;transition:transform .15s, box-shadow .15s}
+  .card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(23,50,77,.12)}
+  .card-top{height:6px}
+  .card-body{padding:14px 16px 16px;display:flex;flex-direction:column;gap:10px;flex:1}
+  .meta-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .chip{font-size:12px;font-weight:600;padding:2px 9px;border-radius:999px;color:#fff;white-space:nowrap}
+  .date{font-size:13px;color:var(--muted)}
+  .card h3{margin:0;font-size:17px;line-height:1.4}
+  .sub{font-size:13px;color:var(--muted)}
+  .price{font-weight:700;color:var(--ink)}
+
+  .badge{font-size:12px;font-weight:700;padding:3px 9px;border-radius:8px;white-space:nowrap}
+  .badge.open{background:var(--soft);color:var(--brand)}
+  .badge.go{background:var(--ok-soft);color:var(--ok)}
+  .badge.full{background:var(--warn-soft);color:var(--warn)}
+  .badge.closed{background:#eee;color:#777}
+
+  /* progress */
+  .prog{position:relative;height:10px;background:var(--soft);border-radius:999px;overflow:visible;margin-top:2px}
+  .prog .fill{height:100%;border-radius:999px;background:var(--brand);transition:width .4s}
+  .prog .fill.go{background:var(--ok)}
+  .prog .th{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--ink);border-radius:2px}
+  .prog-label{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:4px}
+  .prog-label b{color:var(--ink)}
+
+  .faces{display:flex;align-items:center;margin-top:auto}
+  .av{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;color:#fff;font-size:12px;font-weight:700;border:2px solid #fff;margin-left:-7px;flex:none}
+  .faces .av:first-child{margin-left:0}
+  .faces .more{font-size:12px;color:var(--muted);margin-left:8px}
+  .empty{color:var(--muted);text-align:center;padding:40px 0}
+
+  /* sheet */
+  .overlay{position:fixed;inset:0;background:rgba(20,35,48,.45);z-index:50;display:flex;align-items:flex-end;justify-content:center;animation:fade .2s}
+  @media (min-width:720px){.overlay{align-items:center;padding:24px}}
+  .sheet{background:var(--bg);width:100%;max-width:640px;max-height:92vh;overflow-y:auto;border-radius:22px 22px 0 0;animation:up .25s ease-out}
+  @media (min-width:720px){.sheet{border-radius:22px}}
+  @keyframes up{from{transform:translateY(40px);opacity:.4}to{transform:none;opacity:1}}
+  @keyframes fade{from{opacity:0}to{opacity:1}}
+  .sheet-head{padding:18px 20px 16px;background:var(--surface);position:relative}
+  .sheet-head h2{margin:8px 0 6px;font-size:21px;line-height:1.35;padding-right:36px}
+  .close{position:absolute;top:12px;right:12px;width:34px;height:34px;border-radius:50%;border:0;background:var(--soft);font-size:18px;color:var(--ink-2)}
+  .info{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;font-size:14px;margin-top:8px}
+  .info dt{color:var(--muted)}
+  .info dd{margin:0}
+  .sec{background:var(--surface);margin-top:10px;padding:16px 20px}
+  .sec h4{margin:0 0 10px;font-size:15px;display:flex;align-items:center;gap:8px}
+  .sec h4 .count{font-size:13px;color:var(--muted);font-weight:500}
+  .desc{white-space:pre-line;color:var(--ink-2);font-size:14px}
+  .roster{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
+  .roster li{display:flex;align-items:center;gap:8px;background:var(--bg);border-radius:12px;padding:6px 10px 6px 6px;font-size:14px;animation:fade .3s}
+  .roster li .av{margin:0;border:0;width:26px;height:26px}
+  .roster li .no{font-size:11px;color:var(--muted);margin-left:auto}
+  .roster li.me{background:#e3f0f2;outline:1.5px solid var(--brand)}
+  .roster li.wait{background:var(--warn-soft)}
+  .roster li.slot{border:1.5px dashed var(--line);background:transparent;color:#a9b8c2;justify-content:center;padding:8px}
+  .callout{border-radius:14px;padding:12px 14px;font-size:14px;display:flex;gap:10px;align-items:flex-start}
+  .callout.go{background:var(--ok-soft);color:#24553a}
+  .callout.info{background:var(--soft);color:var(--ink-2)}
+  .callout.warn{background:var(--warn-soft);color:#6e4c12}
+  .callout b{display:block}
+  .check{display:flex;gap:8px;align-items:flex-start;font-size:13px;color:var(--ink-2);margin:4px 0 14px;text-align:left}
+  .check input{margin-top:4px}
+  .seg{display:flex;gap:6px;margin-bottom:8px}
+  .seg label{flex:1}
+  .seg input{position:absolute;opacity:0;pointer-events:none}
+  .seg span{display:block;text-align:center;border:1.5px solid var(--line);border-radius:10px;padding:7px;font-size:13px;background:#fff}
+  .seg input:checked + span{border-color:var(--brand);color:var(--brand);font-weight:700;background:#f0f7f8}
+  .seg input:focus-visible + span{outline:2px solid var(--brand)}
+  .sticky-cta{position:sticky;bottom:0;background:var(--surface);border-top:1px solid var(--line);padding:12px 20px calc(12px + env(safe-area-inset-bottom));display:flex;gap:10px;align-items:center}
+  .sticky-cta .left{flex:1;font-size:13px;color:var(--muted);line-height:1.4}
+  .sticky-cta .left b{color:var(--ink);font-size:15px}
+
+  /* admin */
+  .admin-head{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:24px 0 12px}
+  .admin-head h1{margin:0;font-size:24px;flex:1;min-width:200px}
+  .table-wrap{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);overflow-x:auto;margin-bottom:40px}
+  table{width:100%;border-collapse:collapse;font-size:14px;min-width:720px}
+  th,td{padding:12px 14px;text-align:left;border-bottom:1px solid var(--line);vertical-align:middle}
+  th{font-size:12px;color:var(--muted);font-weight:600;background:#fafcfc}
+  tr:last-child td{border-bottom:0}
+  td .t{font-weight:600}
+  td .actions{display:flex;gap:6px;flex-wrap:wrap}
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
+  .form-grid .full{grid-column:1/-1}
+  @media (max-width:520px){.form-grid{grid-template-columns:1fr}}
+  .msg-preview{background:var(--bg);border-radius:12px;padding:12px 14px;white-space:pre-line;font-size:14px;border-left:4px solid #06c755}
+  .notified{font-size:12px;color:var(--ok);font-weight:600}
+  .contact-list{list-style:none;padding:0;margin:0;font-size:14px}
+  .contact-list li{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);align-items:center}
+  .contact-list li:last-child{border-bottom:0}
+  .contact-list .c{color:var(--muted);font-size:13px;margin-left:auto;text-align:right}
+
+  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:11px 18px;border-radius:12px;font-size:14px;z-index:100;box-shadow:0 8px 24px rgba(0,0,0,.2);max-width:calc(100% - 32px);animation:up .25s}
+  .me-chip{display:flex;align-items:center;gap:6px;border:1.5px solid var(--line);background:var(--surface);border-radius:999px;padding:3px 10px 3px 3px;font-size:13px;font-weight:600;max-width:140px}
+  .me-chip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .me-chip .av{margin:0;border:0;width:24px;height:24px;font-size:11px}
+  .loading{position:fixed;inset:0;z-index:300;background:var(--bg);display:grid;place-content:center;justify-items:center;gap:8px;color:var(--muted)}
+  .spinner{width:34px;height:34px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--brand);animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .gate{min-height:calc(100vh - 140px);display:grid;place-items:center;padding:32px 0}
+  .gate-card{background:var(--surface);border-radius:22px;box-shadow:var(--shadow);padding:32px 24px;max-width:420px;width:100%;text-align:center}
+  .gate-card h1{font-size:22px;margin:10px 0 6px}
+  .gate-card p{color:var(--muted);margin:0 0 18px}
+  .gate-emoji{font-size:40px}
+  .gate-actions{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+  .admin-tabs{display:flex;gap:8px;margin:0 0 14px}
+  .count-badge{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:var(--danger);color:#fff;font-size:12px;font-weight:700}
+  .tab.on .count-badge{background:#fff;color:var(--danger)}
+  .badge.pending{background:var(--warn-soft);color:var(--warn)}
+  .badge.admin{background:#e9e4f5;color:#5b4a8f}
+  .proto-note{font-size:12px;color:var(--muted);text-align:center;padding:0 0 28px}
+  .proto-note button{border:0;background:none;color:var(--brand);text-decoration:underline;font-size:12px}
+
+  /* ---------- 體驗模式 ---------- */
+  .demo-banner{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;padding:8px 16px;background:#fff4d6;border-bottom:1px solid #ecd9a8;font-size:13px;color:#6e4c12}
+  .demo-tag{background:#a67c35;color:#fff;font-weight:700;border-radius:999px;padding:2px 10px}
+  .demo-banner b{font-size:14px;color:#18364b}
+  .demo-link{color:#2f6f7e;font-weight:700;text-decoration:none;border:1.5px solid #9ec5ce;background:#fff;border-radius:999px;padding:3px 10px}
+  .demo-btn{border:1.5px solid #e0c58e;background:#fff;color:#6e4c12;border-radius:999px;padding:3px 10px;font-size:13px;font-weight:700}
+  .demo-notices{position:fixed;bottom:16px;right:16px;z-index:400;display:flex;flex-direction:column;gap:10px;width:min(340px,calc(100% - 24px))}
+  .demo-notice{background:#fff;border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.18);padding:12px 14px;border-left:5px solid #06c755;animation:up .25s}
+  .demo-notice .h{display:flex;align-items:center;gap:8px;font-size:12px;color:#607789;margin-bottom:6px}
+  .demo-notice .ic{height:20px;padding:0 6px;border-radius:6px;background:#06c755;color:#fff;font-size:11px;font-weight:700;display:grid;place-items:center}
+  .demo-notice .x{margin-left:auto;border:0;background:none;font-size:18px;color:#8a9aa6;line-height:1}
+  .demo-notice .t{white-space:pre-line;font-size:14px;color:#18364b}
+  .demo-notice .f{font-size:11px;color:#8a9aa6;margin-top:8px}
+</style>
+</head>
+<body>
+<div class="demo-banner">
+  <span class="demo-tag">體驗模式</span><b>社員頁</b>
+  <span>假資料只存在這台電腦，不會影響正式網站</span>
+  <span class="spacer"></span>
+  <a class="demo-link" href="../admin/" target="gwo-demo-admin">開啟管理員頁 ↗</a>
+  <button class="demo-btn" id="demoReset">重來一次</button>
+</div>
+<div class="demo-notices" id="demoNotices"></div>
+
+<header class="top">
+  <div class="wrap">
+    <div class="logo"><div class="logo-mark">出</div><div>出走社<small>A GOOD WAY OUT</small></div></div>
+    <div class="spacer"></div>
+    <button class="me-chip hidden" id="meChip" data-editnick title="修改暱稱"></button>
+    <div class="mode hidden" id="modeSwitch" role="tablist" aria-label="切換視角">
+      <button data-mode="member" class="on">社員</button>
+      <button data-mode="admin">管理員</button>
+    </div>
+  </div>
+</header>
+
+
+<!-- 審核中 / 停用 -->
+<main id="gateView" class="wrap gate hidden"></main>
+
+<!-- 2. 社員：活動總覽 -->
+<main id="memberView" class="wrap hidden">
+  <section class="hero">
+    <div style="flex:1;min-width:220px">
+      <h1>本月一起出走 ✦</h1>
+      <p>看看大家報了什麼，喜歡就 +1 接龍</p>
+    </div>
+  </section>
+
+  <section class="howto" id="howto">
+    <button class="x" id="hideHowto" aria-label="關閉說明">×</button>
+    <h3>第一次參加？三步驟就好 👋</h3>
+    <div class="steps">
+      <div class="step"><b><i>1</i>挑活動</b>看日期、價格，還有誰已經報名</div>
+      <div class="step"><b><i>2</i>+1 接龍</b>只要填暱稱，不用先付錢</div>
+      <div class="step"><b><i>3</i>成團後付款</b>人數到了，管理員會在 LINE 社群通知付款方式</div>
+    </div>
+  </section>
+
+  <nav class="tabs" id="tabs"></nav>
+
+  <div class="layout">
+    <aside class="side">
+      <div class="month">
+        <button id="prevM" aria-label="上個月">‹</button><b id="monthLabel"></b><button id="nextM" aria-label="下個月">›</button>
+      </div>
+      <div class="cal" id="cal"></div>
+    </aside>
+    <div>
+      <div id="dayBar"></div>
+      <section class="grid" id="grid"></section>
+    </div>
+  </div>
+</main>
+
+<!-- 3. 管理員後台 -->
+<main id="adminView" class="wrap hidden">
+  <section class="admin-head">
+    <h1>管理員後台</h1>
+    <button class="btn sm" id="newEvent">＋ 新增活動</button>
+    <button class="btn ghost sm hidden" id="exportCsv">⬇ 匯出試算表（CSV）</button>
+  </section>
+  <nav class="admin-tabs">
+    <button class="tab on" data-atab="events">活動</button>
+    <button class="tab" data-atab="members">人員清單 <span class="count-badge hidden" id="pendingBadge"></span></button>
+  </nav>
+  <section id="membersPanel" class="hidden">
+    <nav class="tabs" id="memberFilters" style="position:static;padding-top:0"></nav>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>暱稱</th><th>LINE 名稱</th><th>狀態</th><th>加入日期</th><th>接龍中</th><th>操作</th></tr></thead>
+        <tbody id="memberRows"></tbody>
+      </table>
+    </div>
+  </section>
+  <div class="table-wrap" id="eventsPanel">
+    <table>
+      <thead><tr><th>日期</th><th>活動</th><th>類別</th><th>接龍 / 門檻 / 名額</th><th>狀態</th><th>操作</th></tr></thead>
+      <tbody id="adminRows"></tbody>
+    </table>
+  </div>
+</main>
+
+<footer class="proto-note">© 出走社 A Good Way Out・活動接龍</footer>
+
+<div id="modalRoot"></div>
+<div id="loading" class="loading"><div class="spinner"></div><p>載入中…</p></div>
+
+<script>window.DEMO_ROLE = 'member';</script>
+<script src="../demo-backend.js"></script>
+<script>
+/* ---------- 設定（都是公開值，可以放在網頁裡） ---------- */
+const CONFIG = {
+  liffId: '2012620335-Hk2HkkYY',
+  supabaseUrl: 'https://qceomzxgeqromtbdxinf.supabase.co',
+  supabaseKey: 'sb_publishable_APl0aO_S_l2nIOZaWbG6Bg_qSazW7zw',
+};
+
+/* ---------- 基本設定 ---------- */
+const CATS = {
+  host:   { name:'出走社主辦', color:'var(--c-host)' },
+  select: { name:'出走社嚴選', color:'var(--c-select)' },
+  member: { name:'社員自揪',   color:'var(--c-member)' },
+  social: { name:'社交活動',   color:'var(--c-social)' },
+};
+const AV_COLORS = ['#2f6f7e','#a67c35','#4f8250','#c0634d','#6a5d9e','#3f7fb0','#b4577e','#5a7a8c'];
+const WEEK = ['日','一','二','三','四','五','六'];
+const pad = (n)=>String(n).padStart(2,'0');
+const TODAY = new Date();
+const todayKey = `${TODAY.getFullYear()}-${pad(TODAY.getMonth()+1)}-${pad(TODAY.getDate())}`;
+
+let state = { events: [], me: null, mine: new Set(), idToken: null, members: [] };
+let ui = { mode:'member', cat:'all', ym:[TODAY.getFullYear(), TODAY.getMonth()], day:null, atab:'events', mfilter:'all' };
+let prefs = { hideHowto:false };
+try{ prefs = { ...prefs, ...JSON.parse(localStorage.getItem('gwo-prefs') || '{}') }; }catch(e){}
+function savePrefs(){ try{ localStorage.setItem('gwo-prefs', JSON.stringify(prefs)); }catch(e){} }
+
+/* ---------- 工具 ---------- */
+const $ = (s)=>document.querySelector(s);
+const esc = (s)=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const money = (n)=> n ? '$'+Number(n).toLocaleString('en-US') : '免費';
+function parseD(s){ const [y,m,d]=s.split('-').map(Number); return new Date(y,m-1,d); }
+function fmtDate(s){ const d=parseD(s); return `${d.getMonth()+1}/${d.getDate()}（${WEEK[d.getDay()]}）`; }
+function fmtTime(iso){ const d=new Date(iso); return `${d.getMonth()+1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`; }
+function avColor(nick){ let h=0; for(const c of nick) h=(h*31+c.charCodeAt(0))>>>0; return AV_COLORS[h%AV_COLORS.length]; }
+function av(nick){ return `<span class="av" style="background:${avColor(nick)}" title="${esc(nick)}">${esc([...nick][0]||'?')}</span>`; }
+function toast(msg){ const t=document.createElement('div'); t.className='toast'; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),2800); }
+
+/* ---------- 連線 ---------- */
+// 所有讀寫都經過後端 API：後端會向 LINE 確認是本人，並檢查是否通過審核
+class ApiErr extends Error { constructor(code, status){ super(code); this.code=code; this.status=status; } }
+async function api(action, payload = {}){
+  const r = await fetch(`${CONFIG.supabaseUrl}/functions/v1/api`, {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json', apikey: CONFIG.supabaseKey },
+    body: JSON.stringify({ action, idToken: state.idToken, ...payload }),
+  });
+  let data = {};
+  try{ data = await r.json(); }catch(e){}
+  if(!r.ok){
+    if(r.status === 401) relogin();
+    throw new ApiErr(data.error || 'server_error', r.status);
+  }
+  return data;
+}
+function relogin(){
+  toast('登入逾時，重新登入中…');
+  setTimeout(()=>{
+    if(liff.isInClient()) location.reload();       // 在 LINE 裡打開：重新整理就會自動登入
+    else { try{ liff.logout(); }catch(e){} liff.login({ redirectUri: location.href }); }
+  }, 800);
+}
+
+async function loadData(){
+  const { activities: acts, signups: sus } = await api('data');
+  const by = {};
+  sus.forEach(s=>{ (by[s.activity_id] ||= []).push({ nick:s.nickname }); });
+  state.events = acts.map(a=>({
+    id:a.id, cat:a.category, title:a.title, host:a.host_name, date:a.event_date,
+    time:a.time_text||'', place:a.place||'', price:a.price, priceNote:a.price_note||'',
+    capacity:a.capacity, threshold:a.threshold, desc:a.description||'',
+    signups: by[a.id] || [],
+  }));
+}
+const isApproved = ()=>state.me?.status === 'approved';
+async function loadMembers(){
+  const r = await api('admin_members');
+  state.members = r.members;
+}
+async function loadMe(){
+  const r = await api('me');
+  state.me = r.member;
+  state.mine = new Set(r.mySignups || []);
+}
+const findEv = (id)=>state.events.find(e=>e.id===id);
+const isMine = (ev)=>state.mine.has(ev.id);
+
+function info(ev){
+  const n = ev.signups.length, reached = n >= ev.threshold, ended = ev.date < todayKey;
+  let status, cls;
+  if(ended){ status='已結束'; cls='closed'; }
+  else if(n >= ev.capacity){ status='額滿'; cls='closed'; }
+  else if(reached){ status=`已成團・剩 ${ev.capacity-n} 位`; cls='go'; }
+  else { status=`接龍中・差 ${ev.threshold-n} 人成團`; cls='open'; }
+  return { n, reached, ended, status, cls, left:Math.max(0, ev.capacity-n), canJoin: !ended && n < ev.capacity };
+}
+function monthEvents(){
+  const [y,m]=ui.ym;
+  return state.events.filter(e=>{ const d=parseD(e.date); return d.getFullYear()===y && d.getMonth()===m; });
+}
+
+/* ---------- 畫面 ---------- */
+function render(){
+  const admin = !!state.me?.is_admin && isApproved();
+  if(!admin) ui.mode = 'member';
+  const gated = !!state.me && !isApproved();
+  $('#gateView').classList.toggle('hidden', !gated);
+  if(gated){
+    $('#modeSwitch').classList.add('hidden');
+    $('#memberView').classList.add('hidden');
+    $('#adminView').classList.add('hidden');
+    renderGate();
+    const chip0 = $('#meChip');
+    chip0.classList.remove('hidden');
+    chip0.innerHTML = `${av(state.me.nickname)}<span>${esc(state.me.nickname)}</span>`;
+    return;
+  }
+  $('#modeSwitch').classList.toggle('hidden', !admin);
+  document.querySelectorAll('#modeSwitch button').forEach(b=>b.classList.toggle('on', b.dataset.mode===ui.mode));
+  const chip = $('#meChip');
+  chip.classList.toggle('hidden', !state.me);
+  if(state.me) chip.innerHTML = `${av(state.me.nickname)}<span>${esc(state.me.nickname)}</span>`;
+  $('#memberView').classList.toggle('hidden', ui.mode!=='member');
+  $('#adminView').classList.toggle('hidden', ui.mode!=='admin');
+  if(ui.mode==='member') renderMember(); else renderAdmin();
+}
+
+function renderGate(){
+  const disabled = state.me.status === 'disabled';
+  $('#gateView').innerHTML = disabled ? `
+    <div class="gate-card"><div class="gate-emoji">🔒</div><h1>帳號已停用</h1>
+      <p>如果有疑問，請在 LINE 社群私訊管理員。</p></div>` : `
+    <div class="gate-card"><div class="gate-emoji">⏳</div><h1>審核中，請稍候</h1>
+      <p>管理員會對照 LINE 社群的成員，確認是「<b>${esc(state.me.nickname)}</b>」本人後開通。<br>通過後這個頁面會自動進入活動總覽。</p>
+      <div class="gate-actions"><button class="btn" data-recheck>重新檢查</button><button class="btn ghost" data-editnick>修改暱稱</button></div></div>`;
+}
+
+function progress(ev, i){
+  const pct = Math.min(100, i.n/ev.capacity*100);
+  const th = ev.threshold/ev.capacity*100;
+  return `<div class="prog"><div class="fill ${i.reached?'go':''}" style="width:${pct}%"></div><div class="th" style="left:calc(${th}% - 1px)" title="開班門檻 ${ev.threshold} 人"></div></div>
+    <div class="prog-label"><span><b>${i.n}</b> / ${ev.capacity} 人</span><span>${ev.threshold} 人成團</span></div>`;
+}
+
+function renderMember(){
+  const [y,m]=ui.ym;
+  $('#monthLabel').textContent = `${y} 年 ${m+1} 月`;
+  $('#howto').classList.toggle('hidden', prefs.hideHowto);
+  const list = monthEvents();
+
+  const counts = {all:list.length}; Object.keys(CATS).forEach(k=>counts[k]=list.filter(e=>e.cat===k).length);
+  $('#tabs').innerHTML = `<button class="tab ${ui.cat==='all'?'on':''}" data-cat="all">全部 <span class="n">${counts.all}</span></button>` +
+    Object.entries(CATS).map(([k,c])=>`<button class="tab ${ui.cat===k?'on':''}" data-cat="${k}"><span class="dot" style="background:${c.color}"></span>${c.name} <span class="n">${counts[k]}</span></button>`).join('');
+
+  const catList = list.filter(e=>ui.cat==='all'||e.cat===ui.cat);
+  renderCalendar(catList);
+  const shown = ui.day ? catList.filter(e=>e.date===ui.day) : catList;
+  $('#dayBar').innerHTML = ui.day ? `<div class="day-bar"><b>${fmtDate(ui.day)} 的活動・${shown.length} 場</b><button class="btn ghost sm" data-dayclear>顯示整個月</button></div>` : '';
+  $('#grid').innerHTML = shown.length ? shown.map(ev=>{
+    const i=info(ev), c=CATS[ev.cat];
+    const faces = ev.signups.slice(0,7).map(s=>av(s.nick)).join('');
+    const more = ev.signups.length>7 ? `+${ev.signups.length-7}` : '';
+    return `<button class="card" data-open="${ev.id}">
+      <div class="card-top" style="background:${c.color}"></div>
+      <div class="card-body">
+        <div class="meta-row"><span class="chip" style="background:${c.color}">${c.name}</span><span class="date">${fmtDate(ev.date)} ${esc(ev.time)}</span></div>
+        <h3>${esc(ev.title)}</h3>
+        <div class="meta-row"><span class="price">${money(ev.price)}</span><span class="sub">${esc(ev.priceNote)}</span><span class="spacer"></span><span class="badge ${i.cls}">${i.status}</span></div>
+        <div>${progress(ev,i)}</div>
+        <div class="faces">${faces || (i.ended ? '' : '<span class="sub">還沒有人報名，當第一個吧！</span>')}${more?`<span class="more">${more}</span>`:''}${isMine(ev)?'<span class="spacer"></span><span class="badge go">✓ 你已接龍</span>':''}</div>
+      </div></button>`;
+  }).join('') : `<div class="empty">${ui.day ? '這天沒有這一類的活動 🍃' : '這個月這一類還沒有活動 🍃'}</div>`;
+}
+
+function renderCalendar(list){
+  const [y,m] = ui.ym;
+  const first = new Date(y,m,1).getDay();
+  const days = new Date(y,m+1,0).getDate();
+  const byDay = {};
+  list.forEach(e=>{ (byDay[e.date] ||= []).push(e); });
+  let cells = '';
+  for(let i=0;i<first;i++) cells += '<span class="cal-day blank"></span>';
+  for(let d=1; d<=days; d++){
+    const key = `${y}-${pad(m+1)}-${pad(d)}`;
+    const evs = byDay[key] || [];
+    const cls = ['cal-day', evs.length?'has':'', key===todayKey?'today':'', ui.day===key?'sel':''].join(' ');
+    const dots = evs.slice(0,3).map(e=>`<i style="background:${CATS[e.cat].color}"></i>`).join('');
+    const label = evs.length ? `${m+1}/${d} 有 ${evs.length} 場活動` : `${m+1}/${d}`;
+    cells += `<button class="${cls}" ${evs.length?`data-day="${key}"`:'disabled'} aria-label="${label}" title="${evs.map(e=>esc(e.title)).join('\n')}">${d}<span class="dots">${dots}</span></button>`;
+  }
+  $('#cal').innerHTML = `<div class="cal-week">${WEEK.map(w=>`<span>${w}</span>`).join('')}</div><div class="cal-grid">${cells}</div>
+    <div class="cal-foot">${list.length ? '點有圓點的日期，只看當天活動' : '這個月還沒有活動'}</div>`;
+}
+
+/* ---------- 活動詳情（接龍） ---------- */
+function openDetail(id){
+  const ev = findEv(id); if(!ev){ closeModal(); return; }
+  const i=info(ev), c=CATS[ev.cat], mine=isMine(ev);
+  const myNick = state.me?.nickname;
+
+  const slots = i.ended ? 0 : Math.max(0, Math.min(ev.capacity - i.n, 12));
+  const roster = ev.signups.map((s,k)=>`<li class="${s.nick===myNick?'me':''}">${av(s.nick)}${esc(s.nick)}${s.nick===myNick?'（我）':''}<span class="no">${k+1}</span></li>`).join('')
+    + Array.from({length:slots},(_,k)=>`<li class="slot">${i.n+k+1}. 空位</li>`).join('');
+
+  let callout = '';
+  if(mine && i.reached){
+    callout = `<div class="callout go">🎉<div><b>已成團！</b>管理員會在 LINE 社群通知大家付款方式，請留意社群訊息。</div></div>`;
+  } else if(mine){
+    callout = `<div class="callout info">✓<div><b>你已接龍，還差 ${ev.threshold-i.n} 人成團</b>成團後管理員會在 LINE 社群通知付款方式。</div></div>`;
+  } else if(!i.reached && !i.ended){
+    callout = `<div class="callout info">💡<div><b>現在接龍不用付錢</b>滿 ${ev.threshold} 人才開班，成團後管理員會在 LINE 社群通知付款方式。</div></div>`;
+  }
+
+  const joinForm = (!mine && i.canJoin) ? `
+    <div class="sec" id="joinSec">
+      <h4>+1 加入接龍</h4>
+      <div class="sub" style="margin-bottom:10px">會以「<b>${esc(myNick)}</b>」顯示在名單上</div>
+      <label class="check"><input type="checkbox" id="jAgree">我了解：接龍不等於完成報名，成團後需依管理員通知完成付款才算保留名額。</label>
+      <div class="err" id="jErr"></div>
+    </div>` : '';
+
+  let cta;
+  if(mine) cta = `<div class="left"><b>✓ 已接龍</b>・${esc(myNick)}<br>需要取消請私訊管理員</div>`;
+  else if(i.canJoin) cta = `<div class="left"><b>${money(ev.price)}</b> ${esc(ev.priceNote)}<br>剩 ${i.left} 個名額</div><button class="btn" data-join="${ev.id}">+1 接龍</button>`;
+  else if(i.ended) cta = `<div class="left"><b>活動已結束</b></div>`;
+  else cta = `<div class="left"><b>名額已滿</b><br>下次早點來 🙏</div><button class="btn" disabled>已額滿</button>`;
+
+  openModal(`
+    <div class="sheet-head">
+      <span class="chip" style="background:${c.color}">${c.name}</span>
+      <h2>${esc(ev.title)}</h2>
+      <button class="close" data-close aria-label="關閉">×</button>
+      <dl class="info">
+        <dt>日期</dt><dd>${fmtDate(ev.date)} ${esc(ev.time)}</dd>
+        <dt>地點</dt><dd>${esc(ev.place)}</dd>
+        <dt>費用</dt><dd><b>${money(ev.price)}</b>${ev.priceNote?'・'+esc(ev.priceNote):''}</dd>
+        <dt>帶領</dt><dd>${esc(ev.host)}</dd>
+      </dl>
+    </div>
+    <div class="sec">
+      <h4>接龍名單 <span class="count">${i.n} / ${ev.capacity}・${ev.threshold} 人成團</span><span class="spacer"></span><span class="badge ${i.cls}">${i.status}</span></h4>
+      ${progress(ev,i)}
+      <ul class="roster" style="margin-top:14px">${roster}</ul>
+    </div>
+    ${callout ? `<div class="sec">${callout}</div>` : ''}
+    ${ev.desc ? `<div class="sec"><h4>活動介紹</h4><div class="desc">${esc(ev.desc)}</div></div>` : ''}
+    ${joinForm}
+    <div class="sticky-cta">${cta}</div>
+  `);
+}
+
+async function join(id, btn){
+  const err = $('#jErr');
+  if(!$('#jAgree').checked){ err.textContent='請勾選確認說明'; $('#joinSec').scrollIntoView({behavior:'smooth'}); return; }
+  const before = info(findEv(id)).reached;
+  btn.disabled = true; btn.textContent = '接龍中…';
+  try{
+    const { result } = await api('join', { activityId:id });
+    await Promise.all([loadData(), loadMe()]);
+    const ev = findEv(id);
+    if(result==='ok' || result==='reached') toast(result==='reached' || (!before && ev && info(ev).reached) ? '🎉 你是成團的關鍵一票！' : '接龍成功！');
+    else if(result==='full') toast('差一點！名額剛好被接滿了');
+    else if(result==='already_joined') toast('你已經在名單上了');
+    else toast('這個活動已經不開放了');
+    render(); openDetail(id);
+  }catch(e){
+    if(e.status!==401){ err.textContent = '接龍失敗，請稍後再試'; btn.disabled=false; btn.textContent='+1 接龍'; }
+  }
+}
+
+/* ---------- 暱稱 ---------- */
+function openNickname(first){
+  openModal(`<div class="sheet-head"><h2>${first?'歡迎來到出走社 👋':'修改暱稱'}</h2>${first?'':'<button class="close" data-close aria-label="關閉">×</button>'}
+      ${first?'<div class="sub">第一次使用，請先設定你在 LINE 社群的暱稱</div>':''}</div>
+    <div class="sec">
+      <label class="field"><span>社群暱稱 <em>（填入與「社群」相同的暱稱，確認身份使用）</em></span>
+        <input class="input" id="nickInput" maxlength="12" value="${esc(state.me?.nickname||'')}" placeholder="例如：小美"></label>
+      <div class="err" id="nickErr"></div>
+      <div class="callout info">🔒<div>我們只會取得你的 LINE 名稱與識別碼，用來確認是你本人，不會公開；名單上只顯示暱稱。</div></div>
+    </div>
+    <div class="sticky-cta"><div class="left"></div><button class="btn" data-savenick>${first?'開始使用':'儲存'}</button></div>`, { locked:first });
+  setTimeout(()=>$('#nickInput')?.focus(), 50);
+}
+async function saveNick(btn){
+  const nickname = $('#nickInput').value.trim();
+  const err = $('#nickErr');
+  if(!nickname){ err.textContent='請填暱稱'; return; }
+  btn.disabled = true;
+  try{
+    const r = await api('set_nickname', { nickname });
+    const first = !state.me;
+    state.me = r.member;
+    if(isApproved()) await loadData();
+    closeModal(true); render();
+    toast(first ? (isApproved() ? `歡迎，${state.me.nickname}！` : '已送出，等待管理員審核') : '暱稱已更新');
+  }catch(e){
+    btn.disabled = false;
+    err.textContent = e.code==='nickname_taken' ? '這個暱稱已經有人用了，換一個吧'
+                    : e.code==='bad_nickname' ? '暱稱需為 1～12 個字'
+                    : '儲存失敗，請稍後再試';
+  }
+}
+
+/* ---------- 管理員後台 ---------- */
+const STATUS_LABEL = { pending:'待審核', approved:'已通過', disabled:'已停用' };
+function renderAdmin(){
+  const pending = state.members.filter(m=>m.status==='pending').length;
+  const badge = $('#pendingBadge');
+  badge.textContent = pending; badge.classList.toggle('hidden', !pending);
+  document.querySelectorAll('[data-atab]').forEach(b=>b.classList.toggle('on', b.dataset.atab===ui.atab));
+  const onMembers = ui.atab==='members';
+  $('#membersPanel').classList.toggle('hidden', !onMembers);
+  $('#eventsPanel').classList.toggle('hidden', onMembers);
+  $('#newEvent').classList.toggle('hidden', onMembers);
+  $('#exportCsv').classList.toggle('hidden', !onMembers);
+  if(onMembers) renderMembers(); else renderEvents();
+}
+
+function renderMembers(){
+  const ms = state.members;
+  const n = (st)=>ms.filter(m=>m.status===st).length;
+  const filters = [['all','全部',ms.length],['pending','待審核',n('pending')],['approved','已通過',n('approved')],['disabled','已停用',n('disabled')]];
+  $('#memberFilters').innerHTML = filters.map(([k,label,c])=>`<button class="tab ${ui.mfilter===k?'on':''}" data-mfilter="${k}">${label} <span class="n">${c}</span></button>`).join('');
+  const shown = ui.mfilter==='all' ? ms : ms.filter(m=>m.status===ui.mfilter);
+  const myNick = state.me?.nickname;
+  $('#memberRows').innerHTML = shown.length ? shown.map(m=>{
+    const self = m.nickname===myNick;
+    const cls = m.status==='approved' ? 'go' : m.status==='pending' ? 'pending' : 'closed';
+    let actions = '';
+    if(m.status==='pending') actions = `<button class="btn sm" data-mset="${m.id}|approved" data-who="${esc(m.nickname)}">通過</button><button class="btn danger sm" data-mset="${m.id}|disabled" data-who="${esc(m.nickname)}">拒絕</button>`;
+    else if(m.status==='disabled') actions = `<button class="btn ghost sm" data-mset="${m.id}|approved" data-who="${esc(m.nickname)}">恢復</button>`;
+    else if(!self) actions = `<button class="btn ghost sm" data-madmin="${m.id}|${m.is_admin?'0':'1'}" data-who="${esc(m.nickname)}">${m.is_admin?'取消管理員':'設為管理員'}</button><button class="btn danger sm" data-mset="${m.id}|disabled" data-who="${esc(m.nickname)}">停用</button>`;
+    return `<tr>
+      <td><div style="display:flex;align-items:center;gap:8px">${av(m.nickname)}<span class="t">${esc(m.nickname)}${self?'（你）':''}</span></div></td>
+      <td>${esc(m.line_name||'—')}</td>
+      <td><span class="badge ${cls}">${STATUS_LABEL[m.status]}</span>${m.is_admin?' <span class="badge admin">管理員</span>':''}</td>
+      <td>${fmtTime(m.created_at)}</td>
+      <td>${m.active_signups} 場</td>
+      <td><div class="actions">${actions}</div></td></tr>`;
+  }).join('') : `<tr><td colspan="6" class="sub" style="text-align:center;padding:30px">沒有符合的人</td></tr>`;
+}
+
+function exportCsv(){
+  const head = ['暱稱','LINE 名稱','狀態','管理員','加入時間','接龍中場數'];
+  const rows = state.members.map(m=>[m.nickname, m.line_name||'', STATUS_LABEL[m.status], m.is_admin?'是':'', new Date(m.created_at).toLocaleString('zh-TW'), m.active_signups]);
+  const csv = [head, ...rows].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\r\n');
+  const blob = new Blob(['\ufeff' + csv], { type:'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `agoodwayout_members_${todayKey}.csv`;   // 英文檔名：部分瀏覽器不支援中文下載檔名
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
+}
+
+function renderEvents(){
+  const rows = [...state.events].sort((a,b)=>a.date.localeCompare(b.date));
+  $('#adminRows').innerHTML = rows.length ? rows.map(ev=>{
+    const i=info(ev), c=CATS[ev.cat];
+    return `<tr>
+      <td>${fmtDate(ev.date)}<div class="sub">${esc(ev.time)}</div></td>
+      <td><div class="t">${esc(ev.title)}</div><div class="sub">${money(ev.price)}・${esc(ev.host)}</div></td>
+      <td><span class="chip" style="background:${c.color}">${c.name}</span></td>
+      <td style="min-width:150px">${progress(ev,i)}</td>
+      <td><span class="badge ${i.cls}">${i.status}</span></td>
+      <td><div class="actions">
+        <button class="btn ghost sm" data-roster="${ev.id}">名單</button>
+        <button class="btn ghost sm" data-edit="${ev.id}">編輯</button>
+      </div></td></tr>`;
+  }).join('') : `<tr><td colspan="6" class="sub" style="text-align:center;padding:30px">還沒有活動，按右上角「新增活動」</td></tr>`;
+}
+
+async function openRoster(id){
+  const ev = findEv(id); if(!ev) return;
+  openModal(`<div class="sheet-head"><h2>${esc(ev.title)}・名單</h2><button class="close" data-close aria-label="關閉">×</button></div><div class="sec sub">載入中…</div>`);
+  try{
+    const { roster } = await api('admin_roster', { activityId:id });
+    const i = info(ev);
+    openModal(`<div class="sheet-head"><h2>${esc(ev.title)}・名單</h2><button class="close" data-close aria-label="關閉">×</button>
+      <div class="sub">已接龍 ${roster.length}/${ev.capacity}・${ev.threshold} 人成團・${i.status}</div></div>
+      <div class="sec">${roster.length ? `<ul class="contact-list">${roster.map((s,k)=>`<li><span class="sub" style="width:20px">${k+1}</span>${av(s.nickname)}<span>${esc(s.nickname)}${s.line_name?`<div class="sub">LINE：${esc(s.line_name)}</div>`:''}</span><span class="c">${fmtTime(s.created_at)}</span><button class="btn danger sm" data-rm="${id}|${esc(s.id)}" data-who="${esc(s.nickname)}">移除</button></li>`).join('')}</ul>` : '<div class="sub">還沒有人接龍</div>'}</div>
+      <div class="sec"><div class="callout info">💡<div>社員無法自行取消接龍，有人私訊要取消時，從這裡移除。「LINE：」後面是對方的 LINE 名稱，只有管理員看得到。</div></div></div>`);
+  }catch(e){
+    if(e.status!==401) openModal(`<div class="sheet-head"><h2>名單</h2><button class="close" data-close aria-label="關閉">×</button></div><div class="sec err">載入失敗，請稍後再試</div>`);
+  }
+}
+
+function openEdit(id){
+  const ev = id ? findEv(id) : { cat:'host', title:'', host:'', date:todayKey, time:'14:00', place:'出走社社辦', price:1000, priceNote:'', capacity:8, threshold:4, desc:'' };
+  const opt = Object.entries(CATS).map(([k,c])=>`<option value="${k}" ${ev.cat===k?'selected':''}>${c.name}</option>`).join('');
+  openModal(`<div class="sheet-head"><h2>${id?'編輯活動':'新增活動'}</h2><button class="close" data-close aria-label="關閉">×</button></div>
+    <form class="sec" id="evForm" onsubmit="return false">
+      <div class="form-grid">
+        <label class="field"><span>類別</span><select class="input" name="category">${opt}</select></label>
+        <label class="field"><span>帶領 / 揪團人</span><input class="input" name="host_name" value="${esc(ev.host)}"></label>
+        <label class="field full"><span>活動名稱</span><input class="input" name="title" value="${esc(ev.title)}"></label>
+        <label class="field"><span>日期</span><input class="input" type="date" name="event_date" value="${esc(ev.date)}"></label>
+        <label class="field"><span>時間</span><input class="input" name="time_text" value="${esc(ev.time)}" placeholder="14:00–16:30"></label>
+        <label class="field full"><span>地點</span><input class="input" name="place" value="${esc(ev.place)}"></label>
+        <label class="field"><span>價格（0 = 免費）</span><input class="input" type="number" min="0" step="50" name="price" value="${ev.price}"></label>
+        <label class="field"><span>價格說明</span><input class="input" name="price_note" value="${esc(ev.priceNote)}" placeholder="含材料 / 含服務費"></label>
+        <label class="field"><span>名額上限</span><input class="input" type="number" min="1" name="capacity" value="${ev.capacity}"></label>
+        <label class="field"><span>開班門檻</span><input class="input" type="number" min="1" name="threshold" value="${ev.threshold}"></label>
+        <label class="field full"><span>活動介紹</span><textarea class="input" rows="4" name="description">${esc(ev.desc)}</textarea></label>
+      </div>
+      <div class="err" id="fErr"></div>
+    </form>
+    <div class="sticky-cta">${id?`<button class="btn danger" data-del="${id}">刪除</button>`:''}<div class="left"></div><button class="btn" data-save="${id||''}">儲存</button></div>`);
+}
+
+async function saveEvent(id, btn){
+  const a = Object.fromEntries(new FormData($('#evForm')).entries());
+  ['price','capacity','threshold'].forEach(k=>a[k]=Number(a[k]));
+  const err = $('#fErr');
+  if(!a.title.trim() || !a.host_name.trim() || !a.event_date){ err.textContent='請填寫名稱、帶領人與日期'; return; }
+  if(!(a.capacity>=1) || !(a.threshold>=1)){ err.textContent='名額與門檻至少要 1'; return; }
+  if(a.threshold > a.capacity){ err.textContent='開班門檻不能大於名額上限'; return; }
+  btn.disabled = true;
+  try{
+    await api('admin_save_activity', { id: id || null, activity: a });
+    await loadData(); closeModal(); render();
+    toast(id ? '已更新活動' : '已新增活動，社員頁面立即看得到');
+  }catch(e){
+    btn.disabled = false;
+    if(e.status!==401) err.textContent = '儲存失敗：' + e.code;
+  }
+}
+
+/* ---------- Modal ---------- */
+let modalLocked = false;
+function openModal(html, opts = {}){
+  const root=$('#modalRoot');
+  const keepScroll = root.querySelector('.sheet')?.scrollTop;
+  modalLocked = !!opts.locked;
+  root.innerHTML = `<div class="overlay" data-overlay><div class="sheet" role="dialog" aria-modal="true">${html}</div></div>`;
+  if(keepScroll) root.querySelector('.sheet').scrollTop = keepScroll;
+  document.body.style.overflow='hidden';
+}
+function closeModal(force){
+  if(modalLocked && !force) return;
+  modalLocked = false;
+  $('#modalRoot').innerHTML=''; document.body.style.overflow='';
+}
+
+/* ---------- 事件 ---------- */
+document.addEventListener('click', async e=>{
+  const t = e.target.closest('[data-atab],[data-mfilter],[data-mset],[data-madmin],[data-recheck],[data-day],[data-dayclear],[data-mode],[data-cat],[data-open],[data-close],[data-overlay],[data-join],[data-roster],[data-rm],[data-edit],[data-save],[data-del],[data-editnick],[data-savenick]');
+  if(!t) return;
+  const d = t.dataset;
+  if(d.overlay!==undefined && e.target!==t) return;
+  if(d.mode){
+    ui.mode=d.mode; closeModal(); render(); window.scrollTo(0,0);
+    if(d.mode==='admin'){ try{ await loadMembers(); render(); }catch(err){} }
+  }
+  else if(d.atab){ ui.atab=d.atab; render(); if(d.atab==='members'){ try{ await loadMembers(); render(); }catch(err){} } }
+  else if(d.mfilter){ ui.mfilter=d.mfilter; renderMembers(); }
+  else if(d.mset || d.madmin){
+    const [mid, val] = (d.mset || d.madmin).split('|');
+    const msg = d.mset
+      ? (val==='approved' ? `通過「${d.who}」？通過後就能看到活動和接龍。` : val==='disabled' ? `停用「${d.who}」？停用後就看不到網站內容。` : '')
+      : (val==='1' ? `把「${d.who}」設為管理員？管理員可以新增活動、看所有人的 LINE 名稱。` : `取消「${d.who}」的管理員權限？`);
+    if(msg && !confirm(msg)) return;
+    t.disabled = true;
+    try{
+      await api('admin_update_member', d.mset ? { memberId:mid, status:val } : { memberId:mid, is_admin: val==='1' });
+      await loadMembers(); render(); toast('已更新');
+    }catch(err){ t.disabled = false; if(err.status!==401) toast('更新失敗：' + err.code); }
+  }
+  else if(d.recheck!==undefined){
+    t.disabled = true;
+    try{ await loadMe(); if(isApproved()){ await loadData(); toast('審核通過，歡迎！'); } else toast('還在審核中，請稍候'); render(); }
+    catch(err){ t.disabled = false; }
+  }
+  else if(d.cat){ ui.cat=d.cat; renderMember(); }
+  else if(d.day){ ui.day = ui.day===d.day ? null : d.day; renderMember(); }
+  else if(d.dayclear!==undefined){ ui.day=null; renderMember(); }
+  else if(d.open) openDetail(d.open);
+  else if(d.close!==undefined || d.overlay!==undefined) closeModal();
+  else if(d.join) join(d.join, t);
+  else if(d.editnick!==undefined) openNickname(false);
+  else if(d.savenick!==undefined) saveNick(t);
+  else if(d.roster) openRoster(d.roster);
+  else if(d.rm){
+    const [aid, sid] = d.rm.split('|');
+    if(!confirm(`確定把「${d.who}」從名單移除？`)) return;
+    t.disabled = true;
+    try{ await api('admin_remove_signup', { signupId:sid }); await loadData(); render(); openRoster(aid); toast('已移除'); }
+    catch(err){ t.disabled = false; if(err.status!==401) toast('移除失敗，請稍後再試'); }
+  }
+  else if(d.edit) openEdit(d.edit);
+  else if(d.save!==undefined) saveEvent(d.save, t);
+  else if(d.del){
+    if(!confirm('確定刪除這個活動？接龍名單也會一起刪除。')) return;
+    t.disabled = true;
+    try{ await api('admin_delete_activity', { id:d.del }); await loadData(); closeModal(); render(); toast('已刪除'); }
+    catch(err){ t.disabled = false; if(err.status!==401) toast('刪除失敗，請稍後再試'); }
+  }
+});
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeModal(); });
+
+$('#hideHowto').onclick = ()=>{ prefs.hideHowto=true; savePrefs(); renderMember(); };
+$('#prevM').onclick = ()=>{ let [y,m]=ui.ym; m--; if(m<0){m=11;y--;} ui.ym=[y,m]; ui.day=null; renderMember(); };
+$('#nextM').onclick = ()=>{ let [y,m]=ui.ym; m++; if(m>11){m=0;y++;} ui.ym=[y,m]; ui.day=null; renderMember(); };
+$('#newEvent').onclick = ()=>openEdit(null);
+$('#exportCsv').onclick = exportCsv;
+
+// 每 30 秒更新一次名單，讓大家看到最新人潮（有視窗開著或頁面在背景時跳過）
+// 審核中的人：每 30 秒檢查是否已通過，通過就自動進入
+setInterval(async ()=>{
+  if(document.hidden || $('#modalRoot').innerHTML || !state.idToken || !state.me) return;
+  try{
+    if(isApproved()){ await loadData(); if(ui.mode==='admin' && ui.atab==='members') await loadMembers(); }
+    else if(state.me.status==='pending'){ await loadMe(); if(isApproved()){ await loadData(); toast('審核通過，歡迎！'); } }
+    render();
+  }catch(e){}
+}, 30000);
+
+/* ---------- 啟動：LINE 登入 → 讀資料 ---------- */
+function showFatal(msg){
+  $('#loading').innerHTML = `<div style="text-align:center;padding:24px"><div style="font-size:36px">😵</div><p>${esc(msg)}</p><button class="btn" onclick="location.reload()">重新整理</button></div>`;
+}
+async function boot(){
+  try{
+    await liff.init({ liffId: CONFIG.liffId });
+  }catch(e){ console.error(e); showFatal('LINE 登入初始化失敗，請稍後再試'); return; }
+  if(!liff.isLoggedIn()){ liff.login({ redirectUri: location.href }); return; }
+  state.idToken = liff.getIDToken();
+  try{
+    await loadMe();
+    if(isApproved()) await loadData();
+  }catch(e){
+    console.error(e);
+    if(e.status===401) return;   // relogin() 會處理
+    showFatal('資料載入失敗，請檢查網路後重新整理'); return;
+  }
+  $('#loading').remove();
+  render();
+  if(!state.me) openNickname(true);
+}
+boot();
+</script>
+<script>
+/* ---------- 體驗模式：兩頁同步、模擬通知、重來一次 ---------- */
+(function(){
+  const ROLE = DemoBackend.ROLE, KEY = DemoBackend.KEY, SEEN = 'gwo-demo-seen';
+  if(ROLE === 'admin') ui.mode = 'admin';
+
+  document.getElementById('demoReset').onclick = ()=>{
+    if(!confirm('清空所有體驗資料，從頭開始？社員頁和管理員頁會一起重來。')) return;
+    DemoBackend.reset();
+    try{ sessionStorage.removeItem(SEEN); }catch(e){}
+    location.reload();
+  };
+
+  // 模擬「官方帳號傳給管理員的 LINE 訊息」
+  const seen = ()=>{ try{ return JSON.parse(sessionStorage.getItem(SEEN) || '[]'); }catch(e){ return []; } };
+  function showNotices(){
+    if(ROLE !== 'admin') return;
+    const s = seen(), all = DemoBackend.notices();
+    all.filter(n=>!s.includes(n.id)).forEach(n=>{
+      const el = document.createElement('div');
+      el.className = 'demo-notice';
+      el.innerHTML = `<div class="h"><span class="ic">LINE</span>出走社 官方帳號（模擬）<button class="x" aria-label="關閉">×</button></div>
+        <div class="t"></div><div class="f">正式上線後，這則會用 LINE 訊息傳到你的手機</div>`;
+      el.querySelector('.t').textContent = n.text;
+      el.querySelector('.x').onclick = ()=>el.remove();
+      document.getElementById('demoNotices').append(el);
+    });
+    try{ sessionStorage.setItem(SEEN, JSON.stringify(all.map(n=>n.id))); }catch(e){}
+  }
+
+  async function refresh(){
+    const was = state.me && state.me.status;
+    await loadMe();
+    if(isApproved()){
+      await loadData();
+      if(was === 'pending') toast('審核通過，歡迎！');
+    }
+    if(ROLE === 'admin' && isApproved()) await loadMembers();
+    if(!document.getElementById('modalRoot').innerHTML) render();
+    showNotices();
+  }
+
+  // 等正式網頁的啟動流程跑完，再做體驗模式的初始化
+  (async ()=>{
+    for(let i = 0; i < 80 && !state.me && !document.getElementById('nickInput'); i++) await new Promise(r=>setTimeout(r, 100));
+    if(ROLE === 'admin'){ try{ await loadMembers(); render(); }catch(e){} }
+    showNotices();
+  })();
+
+  // 另一個頁面改了資料 → 這個頁面跟著更新
+  window.addEventListener('storage', async e=>{
+    if(e.key !== KEY) return;
+    if(e.newValue === null){ location.reload(); return; }   // 另一頁按了「重來一次」
+    try{ await refresh(); }catch(err){ console.error(err); }
+  });
+})();
+</script>
+</body>
+</html>

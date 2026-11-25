@@ -68,6 +68,8 @@
 | `app/index.html` | **正式網頁**：LINE 登入（LIFF）＋讀寫 Supabase。版面沿用 `prototype/stage1_v2.html` |
 | `supabase/functions/api/` | 後端 API：驗證 LINE 身分後處理暱稱、接龍、管理員操作 |
 | `prototype/` | 介面原型（純前端、資料存瀏覽器）。`stage1_v2.html` 是目前定稿的版面（左側日曆） |
+| `demo/` | 體驗模式。`demo-backend.js` 是假後端（規則對照 `supabase/functions/api`）；`member/`、`admin/` 兩頁由 `tools/build_demo.py` 從 `app/index.html` 產生，**不要直接改**，改 `app/` 後重新產生 |
+| `docs/diagrams/` | 說明用的圖（體驗模式結構與流程） |
 | `supabase/migrations/` | 資料表定義 |
 | `docs/` | 本文件 |
 
@@ -89,6 +91,7 @@
 - [x] 人員審核：新成員待審核、管理員通過後才看得到內容；新成員申請時通知管理員
 - [x] 後台「人員清單」：審核／停用／恢復、設定管理員、匯出 CSV
 - [ ] 實機測試：人員審核、人員清單
+- [x] 體驗模式：社員頁 `demo/member/`、管理員頁 `demo/admin/`，同一台電腦兩個視窗即時同步，資料只存在瀏覽器（不連 LINE、不連 Supabase）
 - [ ] 從 LINE 社群對話紀錄新增活動（提案中，見下方）
 - [ ] 每日匯出到 Google 試算表
 
