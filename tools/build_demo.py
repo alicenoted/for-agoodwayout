@@ -50,7 +50,7 @@ DEMO_SCRIPT = """<script>
 /* ---------- 體驗模式：兩頁同步、模擬通知、重來一次 ---------- */
 (function(){
   const ROLE = DemoBackend.ROLE, KEY = DemoBackend.KEY, SEEN = 'gwo-demo-seen';
-  if(ROLE === 'admin') ui.mode = 'admin';
+  if(ROLE === 'admin' && !location.hash) history.replaceState(null, '', '#events');   // 管理員頁預設進「活動管理」
 
   document.getElementById('demoReset').onclick = ()=>{
     if(!confirm('清空所有體驗資料，從頭開始？社員頁和管理員頁會一起重來。')) return;
@@ -91,7 +91,6 @@ DEMO_SCRIPT = """<script>
   // 等正式網頁的啟動流程跑完，再做體驗模式的初始化
   (async ()=>{
     for(let i = 0; i < 80 && !state.me && !document.getElementById('nickInput'); i++) await new Promise(r=>setTimeout(r, 100));
-    if(ROLE === 'admin'){ try{ await loadMembers(); render(); }catch(e){} }
     showNotices();
   })();
 

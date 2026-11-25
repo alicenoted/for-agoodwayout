@@ -209,7 +209,26 @@
   .gate-card p{color:var(--muted);margin:0 0 18px}
   .gate-emoji{font-size:40px}
   .gate-actions{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
-  .admin-tabs{display:flex;gap:8px;margin:0 0 14px}
+  #adminView.wrap, body.is-admin .top .wrap{max-width:1240px}
+  .admin-layout{display:grid;grid-template-columns:220px minmax(0,1fr);gap:28px;align-items:start;padding:24px 0 40px}
+  .admin-side{position:sticky;top:78px;background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);padding:14px 10px}
+  .side-head{font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.08em;padding:4px 12px 10px}
+  .side-nav{display:flex;flex-direction:column;gap:4px}
+  .side-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;color:var(--ink-2);text-decoration:none;font-size:15px;font-weight:600;white-space:nowrap}
+  .side-item svg{width:18px;height:18px;flex:none}
+  .side-item:hover{background:var(--soft)}
+  .side-item.on{background:var(--ink);color:#fff}
+  .side-item .count-badge{margin-left:auto}
+  .side-item.on .count-badge{background:#fff;color:var(--danger)}
+  .admin-main .admin-head{padding:0 0 14px}
+  @media (max-width:819px){
+    .admin-layout{grid-template-columns:1fr;gap:12px;padding-top:12px}
+    .admin-side{position:static;padding:6px}
+    .side-head{display:none}
+    .side-nav{flex-direction:row;overflow-x:auto}
+    .side-item{flex:none}
+    .side-item .count-badge{margin-left:4px}
+  }
   .count-badge{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:var(--danger);color:#fff;font-size:12px;font-weight:700}
   .tab.on .count-badge{background:#fff;color:var(--danger)}
   .badge.pending{background:var(--warn-soft);color:var(--warn)}
@@ -295,15 +314,24 @@
 
 <!-- 3. 管理員後台 -->
 <main id="adminView" class="wrap hidden">
-  <section class="admin-head">
-    <h1>管理員後台</h1>
+ <div class="admin-layout">
+  <aside class="admin-side">
+    <div class="side-head">管理員後台</div>
+    <nav class="side-nav">
+      <a class="side-item" href="#events" data-nav="events">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
+        <span>活動管理</span></a>
+      <a class="side-item" href="#members" data-nav="members">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.4 3.3-5.5 6.5-5.5s5.9 2.1 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18.5 14.8c1.7.8 2.8 2.6 3 5.2"/></svg>
+        <span>人員清單</span><span class="count-badge hidden" id="pendingBadge"></span></a>
+    </nav>
+  </aside>
+  <section class="admin-main">
+  <div class="admin-head">
+    <h1 id="adminTitle">活動管理</h1>
     <button class="btn sm" id="newEvent">＋ 新增活動</button>
     <button class="btn ghost sm hidden" id="exportCsv">⬇ 匯出試算表（CSV）</button>
-  </section>
-  <nav class="admin-tabs">
-    <button class="tab on" data-atab="events">活動</button>
-    <button class="tab" data-atab="members">人員清單 <span class="count-badge hidden" id="pendingBadge"></span></button>
-  </nav>
+  </div>
   <section id="membersPanel" class="hidden">
     <nav class="tabs" id="memberFilters" style="position:static;padding-top:0"></nav>
     <div class="table-wrap">
@@ -319,6 +347,8 @@
       <tbody id="adminRows"></tbody>
     </table>
   </div>
+  </section>
+ </div>
 </main>
 
 <footer class="proto-note">© 出走社 A Good Way Out・活動接龍</footer>
@@ -452,8 +482,22 @@ function render(){
   if(state.me) chip.innerHTML = `${av(state.me.nickname)}<span>${esc(state.me.nickname)}</span>`;
   $('#memberView').classList.toggle('hidden', ui.mode!=='member');
   $('#adminView').classList.toggle('hidden', ui.mode!=='admin');
+  document.body.classList.toggle('is-admin', ui.mode==='admin');
   if(ui.mode==='member') renderMember(); else renderAdmin();
 }
+
+// 網址尾巴決定後台顯示哪一頁：#events 活動管理、#members 人員清單；沒有尾巴 = 社員畫面
+const ADMIN_PAGES = ['events', 'members'];
+function routeFromHash(){
+  const h = location.hash.slice(1);
+  if(ADMIN_PAGES.includes(h) && state.me?.is_admin && isApproved()){ ui.mode = 'admin'; ui.atab = h; }
+  else ui.mode = 'member';
+}
+async function applyRoute(){
+  routeFromHash(); closeModal(); render(); window.scrollTo(0,0);
+  if(ui.mode === 'admin'){ try{ await loadMembers(); render(); }catch(e){} }
+}
+window.addEventListener('hashchange', applyRoute);
 
 function renderGate(){
   const disabled = state.me.status === 'disabled';
@@ -637,8 +681,9 @@ function renderAdmin(){
   const pending = state.members.filter(m=>m.status==='pending').length;
   const badge = $('#pendingBadge');
   badge.textContent = pending; badge.classList.toggle('hidden', !pending);
-  document.querySelectorAll('[data-atab]').forEach(b=>b.classList.toggle('on', b.dataset.atab===ui.atab));
+  document.querySelectorAll('[data-nav]').forEach(b=>b.classList.toggle('on', b.dataset.nav===ui.atab));
   const onMembers = ui.atab==='members';
+  $('#adminTitle').textContent = onMembers ? '人員清單' : '活動管理';
   $('#membersPanel').classList.toggle('hidden', !onMembers);
   $('#eventsPanel').classList.toggle('hidden', onMembers);
   $('#newEvent').classList.toggle('hidden', onMembers);
@@ -773,15 +818,14 @@ function closeModal(force){
 
 /* ---------- 事件 ---------- */
 document.addEventListener('click', async e=>{
-  const t = e.target.closest('[data-atab],[data-mfilter],[data-mset],[data-madmin],[data-recheck],[data-day],[data-dayclear],[data-mode],[data-cat],[data-open],[data-close],[data-overlay],[data-join],[data-roster],[data-rm],[data-edit],[data-save],[data-del],[data-editnick],[data-savenick]');
+  const t = e.target.closest('[data-mfilter],[data-mset],[data-madmin],[data-recheck],[data-day],[data-dayclear],[data-mode],[data-cat],[data-open],[data-close],[data-overlay],[data-join],[data-roster],[data-rm],[data-edit],[data-save],[data-del],[data-editnick],[data-savenick]');
   if(!t) return;
   const d = t.dataset;
   if(d.overlay!==undefined && e.target!==t) return;
   if(d.mode){
-    ui.mode=d.mode; closeModal(); render(); window.scrollTo(0,0);
-    if(d.mode==='admin'){ try{ await loadMembers(); render(); }catch(err){} }
+    if(d.mode==='admin') location.hash = ui.atab || 'events';          // 觸發 hashchange → applyRoute
+    else { history.pushState(null, '', location.pathname + location.search); applyRoute(); }
   }
-  else if(d.atab){ ui.atab=d.atab; render(); if(d.atab==='members'){ try{ await loadMembers(); render(); }catch(err){} } }
   else if(d.mfilter){ ui.mfilter=d.mfilter; renderMembers(); }
   else if(d.mset || d.madmin){
     const [mid, val] = (d.mset || d.madmin).split('|');
@@ -863,7 +907,9 @@ async function boot(){
     showFatal('資料載入失敗，請檢查網路後重新整理'); return;
   }
   $('#loading').remove();
+  routeFromHash();
   render();
+  if(ui.mode === 'admin'){ try{ await loadMembers(); render(); }catch(e){} }
   if(!state.me) openNickname(true);
 }
 boot();
@@ -872,7 +918,7 @@ boot();
 /* ---------- 體驗模式：兩頁同步、模擬通知、重來一次 ---------- */
 (function(){
   const ROLE = DemoBackend.ROLE, KEY = DemoBackend.KEY, SEEN = 'gwo-demo-seen';
-  if(ROLE === 'admin') ui.mode = 'admin';
+  if(ROLE === 'admin' && !location.hash) history.replaceState(null, '', '#events');   // 管理員頁預設進「活動管理」
 
   document.getElementById('demoReset').onclick = ()=>{
     if(!confirm('清空所有體驗資料，從頭開始？社員頁和管理員頁會一起重來。')) return;
@@ -913,7 +959,6 @@ boot();
   // 等正式網頁的啟動流程跑完，再做體驗模式的初始化
   (async ()=>{
     for(let i = 0; i < 80 && !state.me && !document.getElementById('nickInput'); i++) await new Promise(r=>setTimeout(r, 100));
-    if(ROLE === 'admin'){ try{ await loadMembers(); render(); }catch(e){} }
     showNotices();
   })();
 
