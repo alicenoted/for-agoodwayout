@@ -111,6 +111,14 @@ function cleanNickname(v: unknown): string {
   return s;
 }
 
+// 方案選項：一行一個，最多 10 個（方案名稱裡常有「$1,450」這種逗號，所以只用換行分隔）
+function cleanOptions(v: unknown): string | null {
+  if (typeof v !== "string") return null;
+  const list = v.split(/\r?\n/).map((x) => x.trim().slice(0, 40)).filter(Boolean).slice(0, 10);
+  return list.length ? list.join("\n") : null;
+}
+const optionList = (s: string | null) => (s ? s.split("\n") : []);
+
 // 只接受活動表單裡允許的欄位，並檢查內容
 function cleanActivity(a: Record<string, unknown>) {
   const str = (v: unknown, max = 200) => (typeof v === "string" ? v.trim().slice(0, max) : "");
@@ -126,8 +134,13 @@ function cleanActivity(a: Record<string, unknown>) {
     price_note: str(a.price_note) || null,
     capacity: int(a.capacity),
     threshold: int(a.threshold),
-    description: str(a.description, 2000) || null,
+    description: str(a.description, 4000) || null,
+    booking_url: str(a.booking_url, 500) || null,
+    options: cleanOptions(a.options),
+    wait_max: int(a.wait_max ?? 0),
   };
+  if (out.booking_url && !/^https?:\/\//.test(out.booking_url)) throw new ApiError(400, "bad_booking_url");
+  if (!(out.wait_max >= 0 && out.wait_max <= 20)) throw new ApiError(400, "bad_wait_max");
   if (!CATEGORIES.includes(out.category)) throw new ApiError(400, "bad_category");
   if (!out.title || !out.host_name) throw new ApiError(400, "missing_fields");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(out.event_date)) throw new ApiError(400, "bad_date");
@@ -171,7 +184,7 @@ async function handle(body: Record<string, unknown>) {
       const since = new Date(Date.now() - 180 * 86400_000).toISOString().slice(0, 10);
       const activities = await fetchAll<any>(() =>
         db.from("activities")
-          .select("id, category, title, host_name, event_date, time_text, place, price, price_note, capacity, threshold, description")
+          .select("id, category, title, host_name, event_date, time_text, place, price, price_note, capacity, threshold, description, booking_url, options, wait_max")
           .eq("status", "open")
           .gte("event_date", since)
           .order("event_date")
@@ -181,7 +194,7 @@ async function handle(body: Record<string, unknown>) {
       const signups = ids.length
         ? await fetchAll<any>(() =>
           db.from("signups")
-            .select("activity_id, created_at, members(nickname)")
+            .select("activity_id, created_at, option, members(nickname)")
             .in("activity_id", ids)
             .is("cancelled_at", null)
             .order("created_at")
@@ -189,7 +202,7 @@ async function handle(body: Record<string, unknown>) {
         : [];
       return {
         activities,
-        signups: signups.map((s) => ({ activity_id: s.activity_id, nickname: s.members?.nickname })),
+        signups: signups.map((s) => ({ activity_id: s.activity_id, nickname: s.members?.nickname, option: s.option })),
       };
     }
 
@@ -209,12 +222,29 @@ async function handle(body: Record<string, unknown>) {
 
     case "join": {
       const m = requireApproved(member);
+      const activityId = String(body.activityId ?? "");
+      const { data: act } = await db.from("activities").select("options").eq("id", activityId).maybeSingle();
+      const opts = optionList(act?.options ?? null);
+      let option: string | null = typeof body.option === "string" ? body.option.trim() : null;
+      if (opts.length) {
+        if (!option || !opts.includes(option)) throw new ApiError(400, "bad_option");
+      } else option = null;
+      const note = typeof body.note === "string" ? body.note.trim().slice(0, 100) || null : null;
       const { data, error } = await db.rpc("join_activity", {
-        p_activity: String(body.activityId ?? ""),
+        p_activity: activityId,
         p_member: m.id,
+        p_option: option,
+        p_note: note,
       });
       if (error) throw error;
-      return { result: data }; // ok / reached / full / already_joined / not_found
+      return { result: data }; // ok / reached / waitlist / full / already_joined / not_found
+    }
+
+    // 「關於出走社」等網站內容（通過審核的成員才讀得到）
+    case "about": {
+      requireApproved(member);
+      const { data } = await db.from("site_content").select("body, updated_at").eq("key", "about").maybeSingle();
+      return { body: data?.body ?? "", updated_at: data?.updated_at ?? null };
     }
 
     // ---------- 管理員 ----------
@@ -222,11 +252,18 @@ async function handle(body: Record<string, unknown>) {
       const m = requireAdmin(member);
       const a = cleanActivity((body.activity ?? {}) as Record<string, unknown>);
       const id = typeof body.id === "string" && body.id ? body.id : null;
-      const { error } = id
-        ? await db.from("activities").update(a).eq("id", id)
-        : await db.from("activities").insert({ ...a, created_by: m.id });
+      if (id) {
+        const { error } = await db.from("activities").update(a).eq("id", id);
+        if (error) throw error;
+        return { ok: true, created: 0 };
+      }
+      // 新增時可以一次給多個日期（同一份內容，每個日期一場）
+      const extra = Array.isArray(body.dates) ? body.dates.map(String) : [];
+      const dates = [...new Set([a.event_date, ...extra])].slice(0, 20);
+      if (dates.some((d) => !/^\d{4}-\d{2}-\d{2}$/.test(d))) throw new ApiError(400, "bad_date");
+      const { error } = await db.from("activities").insert(dates.map((d) => ({ ...a, event_date: d, created_by: m.id })));
       if (error) throw error;
-      return { ok: true };
+      return { ok: true, created: dates.length };
     }
 
     case "admin_delete_activity": {
@@ -240,7 +277,7 @@ async function handle(body: Record<string, unknown>) {
       requireAdmin(member);
       const { data, error } = await db
         .from("signups")
-        .select("id, created_at, members(nickname, line_display_name)")
+        .select("id, created_at, option, note, paid, members(nickname, line_display_name)")
         .eq("activity_id", String(body.activityId ?? ""))
         .is("cancelled_at", null)
         .order("created_at");
@@ -251,6 +288,9 @@ async function handle(body: Record<string, unknown>) {
           created_at: r.created_at,
           nickname: r.members?.nickname,
           line_name: r.members?.line_display_name,
+          option: r.option,
+          note: r.note,
+          paid: r.paid,
         })),
       };
     }
@@ -262,6 +302,22 @@ async function handle(body: Record<string, unknown>) {
         .update({ cancelled_at: new Date().toISOString() })
         .eq("id", String(body.signupId ?? ""))
         .is("cancelled_at", null);
+      if (error) throw error;
+      return { ok: true };
+    }
+
+    case "admin_set_paid": {
+      requireAdmin(member);
+      const { error } = await db.from("signups").update({ paid: body.paid === true }).eq("id", String(body.signupId ?? ""));
+      if (error) throw error;
+      return { ok: true };
+    }
+
+    case "admin_save_about": {
+      const m = requireAdmin(member);
+      const text = typeof body.body === "string" ? body.body.slice(0, 20000) : "";
+      const { error } = await db.from("site_content")
+        .upsert({ key: "about", body: text, updated_at: new Date().toISOString(), updated_by: m.id });
       if (error) throw error;
       return { ok: true };
     }
