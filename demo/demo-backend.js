@@ -2,7 +2,7 @@
  * 出走社活動接龍：體驗模式的「假後端」
  *
  * 讓 app/index.html 不用 LINE、不用 Supabase 也能完整操作：
- *  - 假的 LIFF：直接視為已登入
+ *  - 假的 LIFF：社員頁第一次打開會走一次模擬的 LINE 登入流程（點連結 → 授權 → 進網站）
  *  - 攔截對後端 API 的呼叫，改用存在瀏覽器 localStorage 的假資料回應
  *  - 規則和正式後端（supabase/functions/api）一樣：審核、名額、成團、管理員權限
  *  - 正式後端會傳 LINE 通知給管理員；體驗模式不傳通知（管理員看側邊欄的待審核數字即可）
@@ -213,9 +213,95 @@
     return realFetch(url, opts);
   };
 
+  // ---------- 模擬 LINE 登入流程（只有社員頁） ----------
+  // 正式網站：在 LINE 社群點連結 → 第一次會看到 LINE 的授權畫面 → 按「許可」→ 進網站。
+  // 這裡用畫面模擬同樣的步驟；按過「許可」就記住，按「重來一次」會清掉。
+  const LINE_OK = 'gwo-demo-line-ok';
+  const lineOk = () => { try { return localStorage.getItem(LINE_OK) === '1'; } catch (e) { return true; } };
+
+  function showLineLogin() {
+    return new Promise((resolve) => {
+      const css = document.createElement('style');
+      css.textContent = `
+        .dl-wrap{position:fixed;inset:0;z-index:500;background:rgba(20,35,48,.55);display:grid;place-items:center;padding:16px;overflow:auto}
+        .dl-phone{width:min(380px,100%);background:#fff;border-radius:24px;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,.3);font-family:inherit}
+        .dl-top{background:#06c755;color:#fff;font-weight:700;padding:12px 16px;display:flex;align-items:center;gap:8px;font-size:15px}
+        .dl-top small{margin-left:auto;font-weight:500;opacity:.85;font-size:12px}
+        .dl-step{font-size:12px;color:#607789;padding:14px 20px 0}
+        .dl-body{padding:12px 20px 20px}
+        .dl-chat{background:#8ca6c4;border-radius:16px;padding:16px 12px;display:flex;gap:8px;align-items:flex-start}
+        .dl-av{width:34px;height:34px;border-radius:50%;background:#2f6f7e;color:#fff;display:grid;place-items:center;font-weight:700;flex:none}
+        .dl-name{font-size:12px;color:#fff;margin-bottom:4px}
+        .dl-bubble{background:#fff;border-radius:4px 16px 16px 16px;padding:10px 12px;font-size:14px;line-height:1.5;color:#18364b}
+        .dl-link{color:#2a6ad6;text-decoration:underline;cursor:pointer;word-break:break-all;border:0;background:none;padding:0;font:inherit;text-align:left}
+        .dl-app{display:flex;gap:12px;align-items:center;margin:6px 0 16px}
+        .dl-icon{width:48px;height:48px;border-radius:12px;background:#18364b;color:#fff;display:grid;place-items:center;font-weight:700;font-size:20px}
+        .dl-sub{font-size:12px;color:#607789}
+        .dl-title{font-weight:700;margin:0 0 8px;color:#18364b}
+        .dl-list{list-style:none;margin:0 0 18px;padding:0;border:1px solid #e3e8ec;border-radius:12px}
+        .dl-list li{display:grid;grid-template-columns:1fr auto;gap:2px 8px;padding:10px 12px;border-bottom:1px solid #e3e8ec;font-size:14px;color:#18364b}
+        .dl-list li:last-child{border-bottom:0}
+        .dl-list span{grid-column:1;font-size:12px;color:#607789}
+        .dl-list em{grid-row:1/3;grid-column:2;align-self:center;font-style:normal;font-size:12px;color:#06c755;font-weight:700}
+        .dl-ok{width:100%;border:0;border-radius:12px;background:#06c755;color:#fff;font-weight:700;font-size:16px;padding:13px;cursor:pointer}
+        .dl-cancel{width:100%;border:0;background:none;color:#607789;font-size:14px;padding:12px;cursor:pointer}
+        .dl-note{background:#fff7e6;color:#6e4c12;font-size:12px;padding:10px 16px;line-height:1.5}
+        .dl-center{text-align:center;color:#18364b}
+        .dl-center p{color:#607789;font-size:14px}`;
+      document.head.appendChild(css);
+      const wrap = document.createElement('div');
+      wrap.className = 'dl-wrap';
+      document.body.appendChild(wrap);
+      const frame = (step, body, note) => {
+        wrap.innerHTML = `<div class="dl-phone" role="dialog" aria-label="LINE 登入（模擬）">
+          <div class="dl-top">LINE<small>模擬畫面</small></div>
+          <div class="dl-step">${step}</div><div class="dl-body">${body}</div>
+          <div class="dl-note">${note}</div></div>`;
+      };
+      const chat = () => {
+        frame('步驟 1／3　在 LINE 社群看到活動連結',
+          `<div class="dl-chat"><div class="dl-av">出</div><div><div class="dl-name">女子出走社（LINE 社群）</div>
+            <div class="dl-bubble">📣 這個月的活動接龍開跑囉！<br>看看誰報名、+1 接龍 👇<br>
+            <button class="dl-link" data-dl="open">https://liff.line.me/2012620335-Hk2HkkYY</button></div></div></div>`,
+          '點上面的藍色連結，繼續下一步');
+      };
+      const consent = () => {
+        frame('步驟 2／3　LINE 詢問是否允許（只有第一次會出現）',
+          `<div class="dl-app"><div class="dl-icon">出</div><div><b>出走社接龍</b><div class="dl-sub">由「出走社」提供</div></div></div>
+           <p class="dl-title">此服務想取得以下權限</p>
+           <ul class="dl-list">
+             <li><b>你的個人檔案資訊</b><span>名稱、大頭貼</span><em>必要</em></li>
+             <li><b>你的用戶識別碼</b><span>用來確認是你本人，不會公開</span><em>必要</em></li>
+           </ul>
+           <button class="dl-ok" data-dl="allow">許可</button>
+           <button class="dl-cancel" data-dl="deny">取消</button>`,
+          '正式網站在 LINE 裡打開時，第一次會看到 LINE 的這個授權畫面；之後就會自動登入');
+      };
+      const denied = () => {
+        frame('步驟 2／3　你按了「取消」',
+          `<div class="dl-center"><div style="font-size:36px">🙅</div><b>需要許可才能使用接龍</b>
+           <p>網站要確認是你本人，才能讓你接龍、顯示在名單上。</p></div>
+           <button class="dl-ok" data-dl="open">重新登入</button>`,
+          '正式網站也是一樣：沒有按「許可」就無法使用');
+      };
+      wrap.addEventListener('click', (e) => {
+        const t = e.target.closest('[data-dl]');
+        if (!t) return;
+        if (t.dataset.dl === 'open') consent();
+        else if (t.dataset.dl === 'deny') denied();
+        else if (t.dataset.dl === 'allow') {
+          try { localStorage.setItem(LINE_OK, '1'); } catch (err) {}
+          wrap.remove();
+          resolve();   // 步驟 3／3：回到網站，開始設定暱稱
+        }
+      });
+      chat();
+    });
+  }
+
   // ---------- 假的 LINE 登入 ----------
   window.liff = {
-    init: async () => {},
+    init: async () => { if (ROLE === 'member' && !lineOk()) await showLineLogin(); },
     isLoggedIn: () => true,
     getIDToken: () => 'demo-' + PERSONAS[ROLE].line,
     isInClient: () => false,
@@ -227,6 +313,6 @@
   window.DemoBackend = {
     KEY,
     ROLE,
-    reset() { try { localStorage.removeItem(KEY); } catch (e) {} },
+    reset() { try { localStorage.removeItem(KEY); localStorage.removeItem(LINE_OK); } catch (e) {} },
   };
 })();

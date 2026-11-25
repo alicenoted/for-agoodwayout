@@ -58,7 +58,7 @@
 | LINE Login channel（測試） | Provider `出走社測試`，Channel ID `2012620335`（開發中狀態，只有管理員／測試者能登入） |
 | LIFF app（測試） | LIFF ID `2012620335-Hk2HkkYY`，網址 `https://liff.line.me/2012620335-Hk2HkkYY`，Endpoint `https://alicenoted.github.io/for-agoodwayout/app/` |
 | Edge Function | `api`（`verify_jwt` 關閉，改由函式自己向 LINE 驗證 ID token） |
-| 官方帳號（測試） | `出走社測試`，Messaging API 屬於 Provider `出走社測試`；金鑰存在 Supabase Edge Function Secrets 的 `LINE_MESSAGING_TOKEN`（不在 repo） |
+| 官方帳號（測試） | `出走社測試`；目前**沒有使用**（LINE 通知已移除）。Supabase Secrets 裡的 `LINE_MESSAGING_TOKEN` 已用不到，可刪除 |
 
 > 正式上線時：在**出走社官方帳號所屬的 Provider** 底下另建 LINE Login channel＋LIFF，替換 `app/index.html` 的 `CONFIG.liffId` 與 Edge Function 的 `LINE_CHANNEL_ID`，並清除測試資料。
 
@@ -87,12 +87,12 @@
 - [x] 實機測試：LINE 登入、設定暱稱（2026-11-15，管理員本人）
 - [x] 管理員帳號設為 `is_admin`（暱稱「設計師愛麗絲」）
 - [x] 實機測試：接龍、管理員新增活動（2026-11-15）
-- [x] 成團時用官方帳號通知管理員（管理員需先加官方帳號好友）
-- [x] 實機測試：成團通知（2026-11-15，管理員收到官方帳號訊息）
-- [x] 人員審核：新成員待審核、管理員通過後才看得到內容；新成員申請時通知管理員
+- [x] ~~成團時用官方帳號通知管理員~~（2026-11-15 做好並實測成功；2026-11-25 依管理員要求移除所有 LINE 通知）
+- [x] 人員審核：新成員待審核、管理員通過後才看得到內容（待審核人數顯示在後台側邊欄）
 - [x] 後台「人員清單」：審核／停用／恢復、設定管理員、匯出 CSV
 - [x] 後台改成左側側邊欄；每個項目有自己的網址尾巴：`#events` 活動管理、`#members` 人員清單（沒有尾巴＝社員畫面；可加書籤、重新整理不跳走、上一頁可退回）
 - [ ] 實機測試：人員審核、人員清單
+- [x] 體驗模式加入模擬 LINE 登入（社群連結 → 授權畫面 → 進網站；按過「許可」會記住，「重來一次」清除）
 - [x] 體驗模式：社員頁 `demo/member/`、管理員頁 `demo/admin/`，同一台電腦兩個視窗即時同步，資料只存在瀏覽器（不連 LINE、不連 Supabase）
 - [ ] 從 LINE 社群對話紀錄新增活動（提案中，見下方）
 - [ ] 每日匯出到 Google 試算表
@@ -102,9 +102,9 @@
 | action | 誰能用 | 說明 |
 |---|---|---|
 | `me` | 登入者 | 回傳暱稱、是否管理員、審核狀態、自己接龍的活動 |
-| `set_nickname` | 登入者 | 第一次建立社員資料（狀態 `pending`，並通知管理員）或修改暱稱；重複回 `409 nickname_taken` |
+| `set_nickname` | 登入者 | 第一次建立社員資料（狀態 `pending`）或修改暱稱；重複回 `409 nickname_taken` |
 | `data` | 通過審核者 | 近 180 天起的開放活動＋各活動的接龍暱稱 |
-| `join` | 通過審核者 | 呼叫 `join_activity()`，回 `ok` / `reached`（這位剛好讓活動成團）/ `full` / `already_joined` / `not_found`；`reached` 時用官方帳號通知所有管理員 |
+| `join` | 通過審核者 | 呼叫 `join_activity()`，回 `ok` / `reached`（這位剛好讓活動成團）/ `full` / `already_joined` / `not_found` |
 | `admin_save_activity` / `admin_delete_activity` | 管理員 | 新增、編輯、刪除活動 |
 | `admin_roster` / `admin_remove_signup` | 管理員 | 看名單（含 LINE 名稱）、移除接龍 |
 | `admin_members` / `admin_update_member` | 管理員 | 人員清單；改審核狀態、設定管理員（不能停用或取消自己） |
