@@ -95,6 +95,10 @@
   @media (max-width:560px){.steps{grid-template-columns:1fr}}
 
 
+  .cal-box{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);padding:10px 12px 12px;margin-bottom:14px}
+  .cal-box .month{display:flex;justify-content:space-between;box-shadow:none;background:transparent;margin:0 0 4px;padding:0}
+  .cal-box .month b{font-size:17px}
+  .cal-box .cal{box-shadow:none;background:transparent;padding:4px 0 0;border-radius:0}
   .cat-card{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);padding:12px 8px;margin-bottom:14px}
   .cat-card .side-head{font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.08em;padding:2px 12px 8px}
   .cat-nav{display:flex;flex-direction:column;gap:2px}
@@ -307,14 +311,16 @@
 
   <div class="layout">
     <aside class="side">
+      <div class="cal-box">
+        <div class="month">
+          <button id="prevM" aria-label="上個月">‹</button><b id="monthLabel"></b><button id="nextM" aria-label="下個月">›</button>
+        </div>
+        <div class="cal" id="cal"></div>
+      </div>
       <div class="cat-card">
         <div class="side-head">活動類別</div>
         <nav class="cat-nav" id="tabs"></nav>
       </div>
-      <div class="month">
-        <button id="prevM" aria-label="上個月">‹</button><b id="monthLabel"></b><button id="nextM" aria-label="下個月">›</button>
-      </div>
-      <div class="cal" id="cal"></div>
     </aside>
     <div>
       <div id="dayBar"></div>
@@ -529,7 +535,7 @@ function progress(ev, i){
 
 function renderMember(){
   const [y,m]=ui.ym;
-  $('#monthLabel').textContent = `${y} 年 ${m+1} 月`;
+  $('#monthLabel').textContent = y === TODAY.getFullYear() ? `${m+1}月` : `${y}年 ${m+1}月`;
   $('#howto').classList.toggle('hidden', prefs.hideHowto);
   const list = monthEvents();
 
