@@ -124,29 +124,29 @@
   .tab.on .n{color:#c9d6df}
 
   .month-group{margin-bottom:22px}
+  .ev-table{min-width:0}
+  .ev-table th:nth-child(1){width:120px} .ev-table th:nth-child(3){width:110px} .ev-table th:nth-child(4){width:170px} .ev-table th:nth-child(5){width:170px}
+  .ev-row{cursor:pointer}
+  .ev-row:hover td{background:#fafcfc}
+  .ev-row .t{font-weight:600}
+  .mg-row td{background:#f3f6f7;font-weight:700;font-size:14px;color:var(--ink-2);padding:9px 14px}
+  .mine-tag{font-size:12px;font-weight:700;color:var(--ok);margin-top:4px}
+  @media (max-width:819px){
+    .ev-wrap{overflow:visible}
+    .ev-table, .ev-table tbody{display:block}
+    .ev-table thead{display:none}
+    .ev-row{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"date status" "main main" "cat cat" "prog prog";gap:6px 10px;padding:12px 14px;border-bottom:1px solid var(--line)}
+    .ev-row td{display:block;padding:0;border:0;background:transparent!important}
+    .c-date{grid-area:date} .c-main{grid-area:main} .c-cat{grid-area:cat} .c-prog{grid-area:prog} .c-status{grid-area:status;text-align:right}
+    .c-date .sub{display:inline;margin-left:6px}
+    .mg-row{display:block} .mg-row td{display:block}
+  }
   .mg-head{margin:0 0 10px;font-size:15px;font-weight:700;color:var(--ink-2)}
   .view-bar{display:flex;align-items:center;gap:10px;margin-bottom:12px}
   .view-bar .count{flex:1;font-size:14px;color:var(--muted)}
   .view-toggle{display:flex;background:var(--soft);border-radius:10px;padding:3px}
   .view-toggle button{display:flex;align-items:center;gap:5px;border:0;background:transparent;padding:5px 12px;border-radius:8px;font-size:13px;color:var(--muted)}
   .view-toggle button.on{background:var(--surface);color:var(--ink);font-weight:700;box-shadow:0 1px 4px rgba(0,0,0,.08)}
-  .rows{display:flex;flex-direction:column;background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
-  .row{display:grid;grid-template-columns:96px minmax(0,1fr) 150px 136px;gap:14px;align-items:center;width:100%;padding:14px 18px;border:0;border-bottom:1px solid var(--line);background:transparent;text-align:left;cursor:pointer}
-  .row:last-child{border-bottom:0}
-  .row:hover{background:#fafcfc}
-  .r-date b{display:block;font-size:15px}
-  .r-date span{font-size:13px;color:var(--muted)}
-  .r-title{font-weight:700;font-size:16px;line-height:1.4;margin-bottom:4px}
-  .r-meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
-  .r-meta .price{font-size:14px}
-  .r-status{display:flex;flex-direction:column;align-items:flex-start;gap:6px}
-  @media (max-width:1100px){
-    .row{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"date status" "main main" "prog prog";gap:6px 10px}
-    .r-date{grid-area:date;display:flex;gap:8px;align-items:baseline}
-    .r-main{grid-area:main}
-    .r-prog{grid-area:prog}
-    .r-status{grid-area:status;flex-direction:row;align-items:center}
-  }
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,280px),1fr));gap:14px}
   .card{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column;cursor:pointer;border:0;text-align:left;padding:0;transition:transform .15s, box-shadow .15s}
   .card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(23,50,77,.12)}
@@ -550,13 +550,13 @@ const monthName = (y, m)=> y === TODAY.getFullYear() ? `${m+1}月` : `${y}年 ${
 
 function rowHtml(ev){
   const i=info(ev), c=CATS[ev.cat];
-  return `<button class="row" data-open="${ev.id}">
-      <div class="r-date"><b>${fmtDate(ev.date)}</b><span>${esc(ev.time)}</span></div>
-      <div class="r-main"><div class="r-title">${esc(ev.title)}</div>
-        <div class="r-meta"><span class="chip" style="background:${c.color}">${c.name}</span><span class="price">${money(ev.price)}</span>${ev.priceNote?`<span>${esc(ev.priceNote)}</span>`:''}</div></div>
-      <div class="r-prog">${progress(ev,i)}</div>
-      <div class="r-status"><span class="badge ${i.cls}">${i.status}</span>${isMine(ev)?'<span class="badge go">✓ 你已接龍</span>':''}</div>
-    </button>`;
+  return `<tr class="ev-row" data-open="${ev.id}">
+      <td class="c-date">${fmtDate(ev.date)}<div class="sub">${esc(ev.time)}</div></td>
+      <td class="c-main"><div class="t">${esc(ev.title)}</div><div class="sub">${money(ev.price)}・${esc(ev.host)}</div></td>
+      <td class="c-cat"><span class="chip" style="background:${c.color}">${c.name}</span></td>
+      <td class="c-prog">${progress(ev,i)}</td>
+      <td class="c-status"><span class="badge ${i.cls}">${i.status}</span>${isMine(ev)?'<div class="mine-tag">✓ 你已接龍</div>':''}</td>
+    </tr>`;
 }
 function cardHtml(ev){
   const i=info(ev), c=CATS[ev.cat];
@@ -605,13 +605,17 @@ function renderMember(){
     if(!groups.length || groups[groups.length-1].key !== key) groups.push({ key, items: [] });
     groups[groups.length-1].items.push(ev);
   });
-  $('#grid').innerHTML = groups.map(g=>{
-    const [gy, gm] = g.key.split('-').map(Number);
-    return `<section class="month-group" id="m-${g.key}">
-      ${ui.day ? '' : `<h3 class="mg-head">${monthName(gy, gm-1)}・${g.items.length} 場活動</h3>`}
-      <div class="${view === 'card' ? 'grid' : 'rows'}">${g.items.map(view === 'card' ? cardHtml : rowHtml).join('')}</div>
-    </section>`;
-  }).join('');
+  const groupTitle = (g)=>{ const [gy, gm] = g.key.split('-').map(Number); return `${monthName(gy, gm-1)}・${g.items.length} 場活動`; };
+  // 列表：跟後台活動表格相同的欄位（日期｜活動｜類別｜接龍/門檻/名額｜狀態），月份用分隔列
+  $('#grid').innerHTML = view === 'list'
+    ? `<div class="table-wrap ev-wrap"><table class="ev-table">
+        <thead><tr><th>日期</th><th>活動</th><th>類別</th><th>接龍 / 門檻 / 名額</th><th>狀態</th></tr></thead>
+        <tbody>${groups.map(g=>(ui.day ? '' : `<tr class="mg-row" id="m-${g.key}"><td colspan="5">${groupTitle(g)}</td></tr>`) + g.items.map(rowHtml).join('')).join('')}</tbody>
+      </table></div>`
+    : groups.map(g=>`<section class="month-group" id="m-${g.key}">
+        ${ui.day ? '' : `<h3 class="mg-head">${groupTitle(g)}</h3>`}
+        <div class="grid">${g.items.map(cardHtml).join('')}</div>
+      </section>`).join('');
 }
 
 // 電腦版：切換月曆月份時，右邊列表捲到那個月（手機版月曆在上方，不自動捲動）
