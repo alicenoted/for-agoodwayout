@@ -124,6 +124,28 @@
   .tab.on{background:var(--ink);border-color:var(--ink);color:#fff}
   .tab.on .n{color:#c9d6df}
 
+  .view-bar{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+  .view-bar .count{flex:1;font-size:14px;color:var(--muted)}
+  .view-toggle{display:flex;background:var(--soft);border-radius:10px;padding:3px}
+  .view-toggle button{display:flex;align-items:center;gap:5px;border:0;background:transparent;padding:5px 12px;border-radius:8px;font-size:13px;color:var(--muted)}
+  .view-toggle button.on{background:var(--surface);color:var(--ink);font-weight:700;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+  .rows{display:flex;flex-direction:column;background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+  .row{display:grid;grid-template-columns:96px minmax(0,1fr) 150px 136px;gap:14px;align-items:center;width:100%;padding:14px 18px;border:0;border-bottom:1px solid var(--line);background:transparent;text-align:left;cursor:pointer}
+  .row:last-child{border-bottom:0}
+  .row:hover{background:#fafcfc}
+  .r-date b{display:block;font-size:15px}
+  .r-date span{font-size:13px;color:var(--muted)}
+  .r-title{font-weight:700;font-size:16px;line-height:1.4;margin-bottom:4px}
+  .r-meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+  .r-meta .price{font-size:14px}
+  .r-status{display:flex;flex-direction:column;align-items:flex-start;gap:6px}
+  @media (max-width:1100px){
+    .row{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"date status" "main main" "prog prog";gap:6px 10px}
+    .r-date{grid-area:date;display:flex;gap:8px;align-items:baseline}
+    .r-main{grid-area:main}
+    .r-prog{grid-area:prog}
+    .r-status{grid-area:status;flex-direction:row;align-items:center}
+  }
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,280px),1fr));gap:14px}
   .card{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column;cursor:pointer;border:0;text-align:left;padding:0;transition:transform .15s, box-shadow .15s}
   .card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(23,50,77,.12)}
@@ -324,6 +346,13 @@
     </aside>
     <div>
       <div id="dayBar"></div>
+      <div class="view-bar">
+        <span class="count" id="resultCount"></span>
+        <div class="view-toggle" role="group" aria-label="顯示方式">
+          <button data-view="list"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></svg>列表</button>
+          <button data-view="card"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><rect x="3" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5"/></svg>卡片</button>
+        </div>
+      </div>
       <section class="grid" id="grid"></section>
     </div>
   </div>
@@ -398,7 +427,7 @@ const todayKey = `${TODAY.getFullYear()}-${pad(TODAY.getMonth()+1)}-${pad(TODAY.
 
 let state = { events: [], me: null, mine: new Set(), idToken: null, members: [] };
 let ui = { mode:'member', cat:'all', ym:[TODAY.getFullYear(), TODAY.getMonth()], day:null, atab:'events', mfilter:'all' };
-let prefs = { hideHowto:false };
+let prefs = { hideHowto:false, view:'list' };   // view：活動顯示方式，預設列表
 try{ prefs = { ...prefs, ...JSON.parse(localStorage.getItem('gwo-prefs') || '{}') }; }catch(e){}
 function savePrefs(){ try{ localStorage.setItem('gwo-prefs', JSON.stringify(prefs)); }catch(e){} }
 
@@ -548,8 +577,22 @@ function renderMember(){
   const catList = list.filter(e=>ui.cat==='all'||e.cat===ui.cat);
   renderCalendar(catList);
   const shown = ui.day ? catList.filter(e=>e.date===ui.day) : catList;
+  const view = prefs.view === 'card' ? 'card' : 'list';
+  document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('on', b.dataset.view===view));
+  $('#resultCount').textContent = `${ui.day ? fmtDate(ui.day) : monthText}・${shown.length} 場活動`;
+  $('#grid').className = view === 'card' ? 'grid' : 'rows';
   $('#dayBar').innerHTML = ui.day ? `<div class="day-bar"><b>${fmtDate(ui.day)} 的活動・${shown.length} 場</b><button class="btn ghost sm" data-dayclear>顯示整個月</button></div>` : '';
-  $('#grid').innerHTML = shown.length ? shown.map(ev=>{
+  $('#grid').innerHTML = !shown.length ? `<div class="empty">${ui.day ? '這天沒有這一類的活動 🍃' : '這個月這一類還沒有活動 🍃'}</div>`
+    : view === 'list' ? shown.map(ev=>{
+    const i=info(ev), c=CATS[ev.cat];
+    return `<button class="row" data-open="${ev.id}">
+      <div class="r-date"><b>${fmtDate(ev.date)}</b><span>${esc(ev.time)}</span></div>
+      <div class="r-main"><div class="r-title">${esc(ev.title)}</div>
+        <div class="r-meta"><span class="chip" style="background:${c.color}">${c.name}</span><span class="price">${money(ev.price)}</span>${ev.priceNote?`<span>${esc(ev.priceNote)}</span>`:''}</div></div>
+      <div class="r-prog">${progress(ev,i)}</div>
+      <div class="r-status"><span class="badge ${i.cls}">${i.status}</span>${isMine(ev)?'<span class="badge go">✓ 你已接龍</span>':''}</div>
+    </button>`;
+  }).join('') : shown.map(ev=>{
     const i=info(ev), c=CATS[ev.cat];
     const faces = ev.signups.slice(0,7).map(s=>av(s.nick)).join('');
     const more = ev.signups.length>7 ? `+${ev.signups.length-7}` : '';
@@ -561,7 +604,7 @@ function renderMember(){
         <div>${progress(ev,i)}</div>
         <div class="faces">${faces || (i.ended ? '' : '<span class="sub">還沒有人報名，當第一個吧！</span>')}${more?`<span class="more">${more}</span>`:''}${isMine(ev)?'<span class="spacer"></span><span class="badge go">✓ 你已接龍</span>':''}</div>
       </div></button>`;
-  }).join('') : `<div class="empty">${ui.day ? '這天沒有這一類的活動 🍃' : '這個月這一類還沒有活動 🍃'}</div>`;
+  }).join('');
 }
 
 function renderCalendar(list){
@@ -836,7 +879,7 @@ function closeModal(force){
 
 /* ---------- 事件 ---------- */
 document.addEventListener('click', async e=>{
-  const t = e.target.closest('[data-mfilter],[data-mset],[data-madmin],[data-recheck],[data-day],[data-dayclear],[data-mode],[data-cat],[data-open],[data-close],[data-overlay],[data-join],[data-roster],[data-rm],[data-edit],[data-save],[data-del],[data-editnick],[data-savenick]');
+  const t = e.target.closest('[data-view],[data-mfilter],[data-mset],[data-madmin],[data-recheck],[data-day],[data-dayclear],[data-mode],[data-cat],[data-open],[data-close],[data-overlay],[data-join],[data-roster],[data-rm],[data-edit],[data-save],[data-del],[data-editnick],[data-savenick]');
   if(!t) return;
   const d = t.dataset;
   if(d.overlay!==undefined && e.target!==t) return;
@@ -844,6 +887,7 @@ document.addEventListener('click', async e=>{
     if(d.mode==='admin') location.hash = ui.atab || 'events';          // 觸發 hashchange → applyRoute
     else { history.pushState(null, '', location.pathname + location.search); applyRoute(); }
   }
+  else if(d.view){ prefs.view = d.view; savePrefs(); renderMember(); }
   else if(d.mfilter){ ui.mfilter=d.mfilter; renderMembers(); }
   else if(d.mset || d.madmin){
     const [mid, val] = (d.mset || d.madmin).split('|');
