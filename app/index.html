@@ -123,6 +123,8 @@
   .tab.on{background:var(--ink);border-color:var(--ink);color:#fff}
   .tab.on .n{color:#c9d6df}
 
+  .month-group{margin-bottom:22px}
+  .mg-head{margin:0 0 10px;font-size:15px;font-weight:700;color:var(--ink-2)}
   .view-bar{display:flex;align-items:center;gap:10px;margin-bottom:12px}
   .view-bar .count{flex:1;font-size:14px;color:var(--muted)}
   .view-toggle{display:flex;background:var(--soft);border-radius:10px;padding:3px}
@@ -337,7 +339,7 @@
           <button data-view="card"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><rect x="3" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5"/></svg>卡片</button>
         </div>
       </div>
-      <section class="grid" id="grid"></section>
+      <div id="grid"></div>
     </div>
   </div>
 </main>
@@ -545,41 +547,23 @@ function progress(ev, i){
     <div class="prog-label"><span><b>${i.n}</b> / ${ev.capacity} 人</span><span>${ev.threshold} 人成團</span></div>`;
 }
 
-function renderMember(){
-  const [y,m]=ui.ym;
-  const monthText = y === TODAY.getFullYear() ? `${m+1}月` : `${y}年 ${m+1}月`;
-  $('#monthLabel').textContent = monthText;
-  $('#catHead').textContent = `${monthText}活動類別`;
-  $('#howto').classList.toggle('hidden', prefs.hideHowto);
-  const list = monthEvents();
+const monthName = (y, m)=> y === TODAY.getFullYear() ? `${m+1}月` : `${y}年 ${m+1}月`;
 
-  const counts = {all:list.length}; Object.keys(CATS).forEach(k=>counts[k]=list.filter(e=>e.cat===k).length);
-  $('#tabs').innerHTML = `<button class="cat-item ${ui.cat==='all'?'on':''}" data-cat="all"><span class="dot" style="background:var(--ink-2)"></span>全部活動<span class="n">${counts.all}</span></button>` +
-    Object.entries(CATS).map(([k,c])=>`<button class="cat-item ${ui.cat===k?'on':''}" data-cat="${k}"><span class="dot" style="background:${c.color}"></span>${c.name}<span class="n">${counts[k]}</span></button>`).join('');
-
-  const catList = list.filter(e=>ui.cat==='all'||e.cat===ui.cat);
-  renderCalendar(catList);
-  const shown = ui.day ? catList.filter(e=>e.date===ui.day) : catList;
-  const view = prefs.view === 'card' ? 'card' : 'list';
-  document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('on', b.dataset.view===view));
-  $('#resultCount').textContent = `${ui.day ? fmtDate(ui.day) : monthText}・${shown.length} 場活動`;
-  $('#grid').className = view === 'card' ? 'grid' : 'rows';
-  $('#dayBar').innerHTML = ui.day ? `<div class="day-bar"><b>${fmtDate(ui.day)} 的活動・${shown.length} 場</b><button class="btn ghost sm" data-dayclear>顯示整個月</button></div>` : '';
-  $('#grid').innerHTML = !shown.length ? `<div class="empty">${ui.day ? '這天沒有這一類的活動 🍃' : '這個月這一類還沒有活動 🍃'}</div>`
-    : view === 'list' ? shown.map(ev=>{
-    const i=info(ev), c=CATS[ev.cat];
-    return `<button class="row" data-open="${ev.id}">
+function rowHtml(ev){
+  const i=info(ev), c=CATS[ev.cat];
+  return `<button class="row" data-open="${ev.id}">
       <div class="r-date"><b>${fmtDate(ev.date)}</b><span>${esc(ev.time)}</span></div>
       <div class="r-main"><div class="r-title">${esc(ev.title)}</div>
         <div class="r-meta"><span class="chip" style="background:${c.color}">${c.name}</span><span class="price">${money(ev.price)}</span>${ev.priceNote?`<span>${esc(ev.priceNote)}</span>`:''}</div></div>
       <div class="r-prog">${progress(ev,i)}</div>
       <div class="r-status"><span class="badge ${i.cls}">${i.status}</span>${isMine(ev)?'<span class="badge go">✓ 你已接龍</span>':''}</div>
     </button>`;
-  }).join('') : shown.map(ev=>{
-    const i=info(ev), c=CATS[ev.cat];
-    const faces = ev.signups.slice(0,7).map(s=>av(s.nick)).join('');
-    const more = ev.signups.length>7 ? `+${ev.signups.length-7}` : '';
-    return `<button class="card" data-open="${ev.id}">
+}
+function cardHtml(ev){
+  const i=info(ev), c=CATS[ev.cat];
+  const faces = ev.signups.slice(0,7).map(s=>av(s.nick)).join('');
+  const more = ev.signups.length>7 ? `+${ev.signups.length-7}` : '';
+  return `<button class="card" data-open="${ev.id}">
       <div class="card-body">
         <div class="meta-row"><span class="chip" style="background:${c.color}">${c.name}</span><span class="date">${fmtDate(ev.date)} ${esc(ev.time)}</span></div>
         <h3>${esc(ev.title)}</h3>
@@ -587,7 +571,55 @@ function renderMember(){
         <div>${progress(ev,i)}</div>
         <div class="faces">${faces || (i.ended ? '' : '<span class="sub">還沒有人報名，當第一個吧！</span>')}${more?`<span class="more">${more}</span>`:''}${isMine(ev)?'<span class="spacer"></span><span class="badge go">✓ 你已接龍</span>':''}</div>
       </div></button>`;
+}
+
+function renderMember(){
+  const [y,m]=ui.ym;
+  const monthText = monthName(y, m);
+  $('#monthLabel').textContent = monthText;
+  $('#catHead').textContent = `${monthText}活動類別`;
+  $('#howto').classList.toggle('hidden', prefs.hideHowto);
+
+  // 側邊欄：類別數字與月曆，跟著月曆顯示的月份
+  const list = monthEvents();
+  const counts = {all:list.length}; Object.keys(CATS).forEach(k=>counts[k]=list.filter(e=>e.cat===k).length);
+  $('#tabs').innerHTML = `<button class="cat-item ${ui.cat==='all'?'on':''}" data-cat="all"><span class="dot" style="background:var(--ink-2)"></span>全部活動<span class="n">${counts.all}</span></button>` +
+    Object.entries(CATS).map(([k,c])=>`<button class="cat-item ${ui.cat===k?'on':''}" data-cat="${k}"><span class="dot" style="background:${c.color}"></span>${c.name}<span class="n">${counts[k]}</span></button>`).join('');
+  const inCat = (e)=>ui.cat==='all' || e.cat===ui.cat;
+  renderCalendar(list.filter(inCat));
+
+  // 右邊：從這個月開始一路往下列出所有活動，依月份分段（點了日曆某天則只看那天）
+  const thisMonth = `${TODAY.getFullYear()}-${pad(TODAY.getMonth()+1)}`;
+  const shown = ui.day ? state.events.filter(e=>inCat(e) && e.date===ui.day)
+                       : state.events.filter(e=>inCat(e) && e.date.slice(0,7) >= thisMonth);
+  const view = prefs.view === 'card' ? 'card' : 'list';
+  document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('on', b.dataset.view===view));
+  $('#resultCount').textContent = ui.day ? `${fmtDate(ui.day)}・${shown.length} 場活動` : `共 ${shown.length} 場活動`;
+  $('#dayBar').innerHTML = ui.day ? `<div class="day-bar"><b>${fmtDate(ui.day)} 的活動・${shown.length} 場</b><button class="btn ghost sm" data-dayclear>顯示全部</button></div>` : '';
+  if(!shown.length){
+    $('#grid').innerHTML = `<div class="empty">${ui.day ? '這天沒有這一類的活動 🍃' : '目前沒有這一類的活動 🍃'}</div>`;
+    return;
+  }
+  const groups = [];
+  shown.forEach(ev=>{
+    const key = ev.date.slice(0,7);
+    if(!groups.length || groups[groups.length-1].key !== key) groups.push({ key, items: [] });
+    groups[groups.length-1].items.push(ev);
+  });
+  $('#grid').innerHTML = groups.map(g=>{
+    const [gy, gm] = g.key.split('-').map(Number);
+    return `<section class="month-group" id="m-${g.key}">
+      ${ui.day ? '' : `<h3 class="mg-head">${monthName(gy, gm-1)}・${g.items.length} 場活動</h3>`}
+      <div class="${view === 'card' ? 'grid' : 'rows'}">${g.items.map(view === 'card' ? cardHtml : rowHtml).join('')}</div>
+    </section>`;
   }).join('');
+}
+
+// 電腦版：切換月曆月份時，右邊列表捲到那個月（手機版月曆在上方，不自動捲動）
+function scrollToMonth(){
+  if(window.innerWidth < 820) return;
+  const el = document.getElementById(`m-${ui.ym[0]}-${pad(ui.ym[1]+1)}`);
+  if(el) window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 80, behavior: 'smooth' });
 }
 
 function renderCalendar(list){
@@ -917,8 +949,8 @@ document.addEventListener('click', async e=>{
 document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeModal(); });
 
 $('#hideHowto').onclick = ()=>{ prefs.hideHowto=true; savePrefs(); renderMember(); };
-$('#prevM').onclick = ()=>{ let [y,m]=ui.ym; m--; if(m<0){m=11;y--;} ui.ym=[y,m]; ui.day=null; renderMember(); };
-$('#nextM').onclick = ()=>{ let [y,m]=ui.ym; m++; if(m>11){m=0;y++;} ui.ym=[y,m]; ui.day=null; renderMember(); };
+$('#prevM').onclick = ()=>{ let [y,m]=ui.ym; m--; if(m<0){m=11;y--;} ui.ym=[y,m]; ui.day=null; renderMember(); scrollToMonth(); };
+$('#nextM').onclick = ()=>{ let [y,m]=ui.ym; m++; if(m>11){m=0;y++;} ui.ym=[y,m]; ui.day=null; renderMember(); scrollToMonth(); };
 $('#newEvent').onclick = ()=>openEdit(null);
 $('#exportCsv').onclick = exportCsv;
 
