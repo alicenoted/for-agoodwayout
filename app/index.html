@@ -62,8 +62,8 @@
   .month b{min-width:96px;text-align:center;font-size:14px}
 
   /* layout: calendar + cards */
-  .layout{display:grid;grid-template-columns:1fr;gap:16px;padding:12px 0 40px}
-  @media (min-width:820px){.layout{grid-template-columns:270px 1fr;gap:24px}.side{position:sticky;top:122px;align-self:start}}
+  .layout{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;padding:12px 0 40px}
+  @media (min-width:820px){.layout{grid-template-columns:270px 1fr;gap:24px}.side{position:sticky;top:78px;align-self:start;max-height:calc(100vh - 90px);overflow-y:auto;scrollbar-width:none}}
   .cal{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);padding:14px 12px 12px}
   @media (max-width:819px){.cal{max-width:420px}.cal-day{aspect-ratio:auto;height:40px}}
   .cal-week,.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center}
@@ -94,6 +94,23 @@
   @media (max-width:560px){.steps{grid-template-columns:1fr}}
 
 
+  .cat-card{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);padding:12px 8px;margin-bottom:14px}
+  .cat-card .side-head{font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.08em;padding:2px 12px 8px}
+  .cat-nav{display:flex;flex-direction:column;gap:2px}
+  .cat-item{display:flex;align-items:center;gap:10px;width:100%;border:0;background:transparent;padding:9px 12px;border-radius:10px;font-size:15px;color:var(--ink-2);text-align:left;white-space:nowrap}
+  .cat-item .dot{width:10px;height:10px;border-radius:50%;flex:none}
+  .cat-item .n{margin-left:auto;font-size:12px;color:var(--muted);background:var(--soft);border-radius:999px;padding:1px 8px;min-width:24px;text-align:center}
+  .cat-item:hover{background:var(--soft)}
+  .cat-item.on{background:var(--ink);color:#fff;font-weight:700}
+  .cat-item.on .dot{box-shadow:0 0 0 2px rgba(255,255,255,.85)}
+  .cat-item.on .n{background:rgba(255,255,255,.2);color:#fff}
+  @media (max-width:819px){
+    .cat-card{padding:6px;margin-bottom:10px}
+    .cat-card .side-head{display:none}
+    .cat-nav{flex-direction:row;overflow-x:auto;scrollbar-width:none}
+    .cat-item{width:auto;flex:none}
+    .cat-item .n{margin-left:2px}
+  }
   .tabs{display:flex;gap:8px;overflow-x:auto;padding:14px 0 6px;scrollbar-width:none;position:sticky;top:58px;background:var(--bg);z-index:5}
   .tabs::-webkit-scrollbar{display:none}
   .tab{flex:none;border:1.5px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 14px;font-size:14px;color:var(--ink-2);display:flex;align-items:center;gap:6px}
@@ -273,10 +290,12 @@
     </div>
   </section>
 
-  <nav class="tabs" id="tabs"></nav>
-
   <div class="layout">
     <aside class="side">
+      <div class="cat-card">
+        <div class="side-head">活動類別</div>
+        <nav class="cat-nav" id="tabs"></nav>
+      </div>
       <div class="month">
         <button id="prevM" aria-label="上個月">‹</button><b id="monthLabel"></b><button id="nextM" aria-label="下個月">›</button>
       </div>
@@ -370,7 +389,7 @@ function fmtDate(s){ const d=parseD(s); return `${d.getMonth()+1}/${d.getDate()}
 function fmtTime(iso){ const d=new Date(iso); return `${d.getMonth()+1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`; }
 function avColor(nick){ let h=0; for(const c of nick) h=(h*31+c.charCodeAt(0))>>>0; return AV_COLORS[h%AV_COLORS.length]; }
 function av(nick){ return `<span class="av" style="background:${avColor(nick)}" title="${esc(nick)}">${esc([...nick][0]||'?')}</span>`; }
-function toast(msg){ const t=document.createElement('div'); t.className='toast'; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),2800); }
+function toast(msg){ document.querySelectorAll('.toast').forEach(x=>x.remove()); const t=document.createElement('div'); t.className='toast'; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),2800); }
 
 /* ---------- 連線 ---------- */
 // 所有讀寫都經過後端 API：後端會向 LINE 確認是本人，並檢查是否通過審核
@@ -499,8 +518,8 @@ function renderMember(){
   const list = monthEvents();
 
   const counts = {all:list.length}; Object.keys(CATS).forEach(k=>counts[k]=list.filter(e=>e.cat===k).length);
-  $('#tabs').innerHTML = `<button class="tab ${ui.cat==='all'?'on':''}" data-cat="all">全部 <span class="n">${counts.all}</span></button>` +
-    Object.entries(CATS).map(([k,c])=>`<button class="tab ${ui.cat===k?'on':''}" data-cat="${k}"><span class="dot" style="background:${c.color}"></span>${c.name} <span class="n">${counts[k]}</span></button>`).join('');
+  $('#tabs').innerHTML = `<button class="cat-item ${ui.cat==='all'?'on':''}" data-cat="all"><span class="dot" style="background:var(--ink-2)"></span>全部活動<span class="n">${counts.all}</span></button>` +
+    Object.entries(CATS).map(([k,c])=>`<button class="cat-item ${ui.cat===k?'on':''}" data-cat="${k}"><span class="dot" style="background:${c.color}"></span>${c.name}<span class="n">${counts[k]}</span></button>`).join('');
 
   const catList = list.filter(e=>ui.cat==='all'||e.cat===ui.cat);
   renderCalendar(catList);
