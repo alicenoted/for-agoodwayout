@@ -17,7 +17,7 @@ const LIFF_URL = "https://liff.line.me/2012620335-Hk2HkkYY";
 
 // 允許呼叫這個 API 的網站
 const ALLOWED_ORIGINS = [
-  "https://alicenoted-coder.github.io",
+  "https://alicenoted.github.io",
   "http://localhost:8000",
 ];
 

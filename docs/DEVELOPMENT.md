@@ -53,9 +53,10 @@
 | 服務 | 值 |
 |---|---|
 | Supabase 專案 | `agoodwayout`，URL `https://qceomzxgeqromtbdxinf.supabase.co`（組織 `alicenoted-job`，東京） |
-| GitHub Pages | 從 `claude/dazzling-bell-q1quxi` 分支根目錄發布：`https://alicenoted-coder.github.io/for-agoodwayout/` |
+| GitHub Pages | 從 `claude/dazzling-bell-q1quxi` 分支根目錄發布：`https://alicenoted.github.io/for-agoodwayout/` |
+| GitHub repo | `alicenoted/for-agoodwayout`（2026-11-25 從 `alicenoted-coder` 轉移過來；舊的 `alicenoted-coder.github.io` Pages 網址已失效） |
 | LINE Login channel（測試） | Provider `出走社測試`，Channel ID `2012620335`（開發中狀態，只有管理員／測試者能登入） |
-| LIFF app（測試） | LIFF ID `2012620335-Hk2HkkYY`，網址 `https://liff.line.me/2012620335-Hk2HkkYY`，Endpoint `https://alicenoted-coder.github.io/for-agoodwayout/app/` |
+| LIFF app（測試） | LIFF ID `2012620335-Hk2HkkYY`，網址 `https://liff.line.me/2012620335-Hk2HkkYY`，Endpoint `https://alicenoted.github.io/for-agoodwayout/app/` |
 | Edge Function | `api`（`verify_jwt` 關閉，改由函式自己向 LINE 驗證 ID token） |
 | 官方帳號（測試） | `出走社測試`，Messaging API 屬於 Provider `出走社測試`；金鑰存在 Supabase Edge Function Secrets 的 `LINE_MESSAGING_TOKEN`（不在 repo） |
 
