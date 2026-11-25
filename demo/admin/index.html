@@ -318,7 +318,7 @@
         <div class="cal" id="cal"></div>
       </div>
       <div class="cat-card">
-        <div class="side-head">活動類別</div>
+        <div class="side-head" id="catHead">活動類別</div>
         <nav class="cat-nav" id="tabs"></nav>
       </div>
     </aside>
@@ -535,7 +535,9 @@ function progress(ev, i){
 
 function renderMember(){
   const [y,m]=ui.ym;
-  $('#monthLabel').textContent = y === TODAY.getFullYear() ? `${m+1}月` : `${y}年 ${m+1}月`;
+  const monthText = y === TODAY.getFullYear() ? `${m+1}月` : `${y}年 ${m+1}月`;
+  $('#monthLabel').textContent = monthText;
+  $('#catHead').textContent = `${monthText}活動類別`;
   $('#howto').classList.toggle('hidden', prefs.hideHowto);
   const list = monthEvents();
 
