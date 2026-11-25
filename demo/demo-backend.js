@@ -5,7 +5,7 @@
  *  - 假的 LIFF：直接視為已登入
  *  - 攔截對後端 API 的呼叫，改用存在瀏覽器 localStorage 的假資料回應
  *  - 規則和正式後端（supabase/functions/api）一樣：審核、名額、成團、管理員權限
- *  - 正式後端會傳 LINE 通知的地方，改成存一筆「模擬通知」，管理員頁面會跳出來
+ *  - 正式後端會傳 LINE 通知給管理員；體驗模式不傳通知（管理員看側邊欄的待審核數字即可）
  *
  * 社員頁和管理員頁在同一個網站底下，共用同一份 localStorage，所以一邊操作另一邊會即時更新。
  * 每個頁面在載入本檔前要先設定 window.DEMO_ROLE = 'member' 或 'admin'。
@@ -50,7 +50,7 @@
       S('a-3', 'm-2', 900),  S('a-3', 'm-3', 800),
       S('a-5', 'm-1', 700),  S('a-5', 'm-2', 600), S('a-5', 'm-3', 500), S('a-5', 'm-4', 400), S('a-5', 'm-admin', 300),
     ];
-    return { members, activities, signups, notices: [] };
+    return { members, activities, signups };
   }
 
   function load() {
@@ -65,8 +65,6 @@
   class ApiError extends Error { constructor(status, code) { super(code); this.status = status; this.code = code; } }
   const memberOut = (m) => ({ nickname: m.nickname, is_admin: m.is_admin, status: m.status });
   const active = (db) => db.signups.filter((s) => !s.cancelled_at);
-  const fmtWhen = (a) => { const d = new Date(a.event_date + 'T00:00:00'); return `${d.getMonth() + 1}/${d.getDate()}（${'日一二三四五六'[d.getDay()]}）${a.time_text ? ' ' + a.time_text : ''}`; };
-  function notify(db, kind, text) { db.notices.push({ id: uid('n'), kind, text, at: new Date().toISOString() }); }
 
   function requireMember(m) { if (!m) throw new ApiError(403, 'no_nickname'); return m; }
   function requireApproved(m) { requireMember(m); if (m.status !== 'approved') throw new ApiError(403, m.status); return m; }
@@ -106,7 +104,6 @@
         else {
           me = { id: uid('m'), line: persona.line, line_name: persona.lineName, nickname, is_admin: false, status: 'pending', created_at: new Date().toISOString() };
           db.members.push(me);
-          notify(db, 'new_member', `🙋【新成員待審核】\n暱稱：${nickname}\nLINE 名稱：${persona.lineName}\n請到後台「人員清單」審核`);
         }
         changed = true;
         result = { member: memberOut(me) };
@@ -122,7 +119,6 @@
         if (list.length >= a.capacity) { result = { result: 'full' }; break; }
         db.signups.push({ id: uid('s'), activity_id: a.id, member_id: me.id, created_at: new Date().toISOString(), cancelled_at: null });
         const reached = list.length + 1 === a.threshold;
-        if (reached) notify(db, 'reached', `🎉【成團】${a.title}\n${fmtWhen(a)}・目前 ${list.length + 1}／${a.capacity} 人（門檻 ${a.threshold} 人）\n記得到 LINE 社群公告付款方式`);
         changed = true;
         result = { result: reached ? 'reached' : 'ok' };
         break;
@@ -232,6 +228,5 @@
     KEY,
     ROLE,
     reset() { try { localStorage.removeItem(KEY); } catch (e) {} },
-    notices() { return load().notices; },
   };
 })();

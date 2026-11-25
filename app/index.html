@@ -122,7 +122,6 @@
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,280px),1fr));gap:14px}
   .card{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column;cursor:pointer;border:0;text-align:left;padding:0;transition:transform .15s, box-shadow .15s}
   .card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(23,50,77,.12)}
-  .card-top{height:6px}
   .card-body{padding:14px 16px 16px;display:flex;flex-direction:column;gap:10px;flex:1}
   .meta-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   .chip{font-size:12px;font-weight:600;padding:2px 9px;border-radius:999px;color:#fff;white-space:nowrap}
@@ -530,7 +529,6 @@ function renderMember(){
     const faces = ev.signups.slice(0,7).map(s=>av(s.nick)).join('');
     const more = ev.signups.length>7 ? `+${ev.signups.length-7}` : '';
     return `<button class="card" data-open="${ev.id}">
-      <div class="card-top" style="background:${c.color}"></div>
       <div class="card-body">
         <div class="meta-row"><span class="chip" style="background:${c.color}">${c.name}</span><span class="date">${fmtDate(ev.date)} ${esc(ev.time)}</span></div>
         <h3>${esc(ev.title)}</h3>
