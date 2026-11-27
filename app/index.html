@@ -544,14 +544,14 @@ async function loadData(){
     capacity:a.capacity, threshold:a.threshold, desc:a.description||'',
     booking:a.booking_url||'', options:a.options ? a.options.split('\n') : [], waitMax:a.wait_max||0,
     images:a.images||[], status:a.status||'open', mineCreated:!!a.mine_created,
-    reviewNote:a.review_note||'', submittedAt:a.created_at||'', proposer:a.proposer||'', proposerLine:a.proposer_line||'',
+    reviewNote:a.review_note||'', cancelReason:a.cancel_reason||'', submittedAt:a.created_at||'', proposer:a.proposer||'', proposerLine:a.proposer_line||'',
     signups: by[a.id] || [],
   });
   state.events = acts.map(toEv);
   state.myProposals = (myProposals || []).map(toEv);
 }
-// 社員看得到的活動（管理員的 state.events 裡還有待審核／已退回的自揪申請）
-const openEvents = ()=>state.events.filter(e=>e.status==='open');
+// 社員看得到的活動：上架中＋已流標（管理員的 state.events 裡還有待審核／已退回的自揪申請）
+const openEvents = ()=>state.events.filter(e=>e.status==='open' || e.status==='cancelled');
 const isApproved = ()=>state.me?.status === 'approved';
 async function loadMembers(){
   const r = await api('admin_members');
@@ -571,14 +571,15 @@ function info(ev){
   const n = Math.min(total, ev.capacity), waitN = Math.max(0, total - ev.capacity);
   const reached = n >= ev.threshold, ended = ev.date < todayKey;
   let status, cls;
-  if(ended){ status='已結束'; cls='closed'; }
+  if(ev.status==='cancelled'){ status='已流標'; cls='closed'; }
+  else if(ended){ status='已結束'; cls='closed'; }
   // 順序：接龍中 → 已成團（到開班門檻）→ 滿團（到名額上限，之後才能排候補）→ 候補也滿
   else if(total >= ev.capacity + wm){ status = wm ? '滿團・候補已滿' : '滿團'; cls='closed'; }
   else if(total >= ev.capacity){ status=`滿團・可候補 ${ev.capacity + wm - total} 位`; cls='full'; }
   else if(reached){ status=`已成團・剩 ${ev.capacity-n} 位`; cls='go'; }
   else { status=`接龍中・差 ${ev.threshold-n} 人成團`; cls='open'; }
   return { n, total, waitN, reached, ended, status, cls, left:Math.max(0, ev.capacity-n),
-           canJoin: !ended && total < ev.capacity + wm, isWait: total >= ev.capacity };
+           canJoin: ev.status!=='cancelled' && !ended && total < ev.capacity + wm, isWait: total >= ev.capacity, flopped: ev.status==='cancelled' };
 }
 // 我在這場的位置：-1＝沒接龍；>= 名額＝候補中
 const myIndex = (ev)=> isMine(ev) ? ev.signups.findIndex(s=>s.nick===state.me?.nickname) : -1;
@@ -798,7 +799,9 @@ function openDetail(id){
 
   const payBtn = ev.booking ? `<div style="margin-top:10px"><a class="btn sm" href="${esc(ev.booking)}" target="_blank" rel="noopener">前往預約付款 ↗</a></div>` : '';
   let callout = '';
-  if(mine && waiting){
+  if(i.flopped){
+    callout = `<div class="callout warn">😢<div><b>這場活動已流標</b>沒有達到 ${ev.threshold} 人開班門檻，活動取消。${ev.cancelReason ? `<br>說明：${esc(ev.cancelReason)}` : ''}${mine ? '<br>如果你已經付款，管理員會另外聯繫你退款。' : ''}</div></div>`;
+  } else if(mine && waiting){
     callout = `<div class="callout warn">⏳<div><b>你在候補第 ${myIdx - ev.capacity + 1} 位</b>有人取消時會依序遞補，管理員會通知你。</div></div>`;
   } else if(mine && i.reached){
     callout = ev.booking
@@ -826,6 +829,7 @@ function openDetail(id){
   if(mine) cta = waiting ? `<div class="left"><b>⏳ 候補中</b>・${esc(myNick)}<br>需要取消請私訊管理員</div>`
                          : `<div class="left"><b>✓ 已接龍</b>・${esc(myNick)}<br>需要取消請私訊管理員</div>${i.reached && ev.booking ? `<a class="btn" href="${esc(ev.booking)}" target="_blank" rel="noopener">預約付款 ↗</a>` : ''}`;
   else if(i.canJoin) cta = `<div class="left"><b>${money(ev.price)}</b> ${esc(ev.priceNote)}<br>${i.isWait ? `已滿團・候補剩 ${ev.capacity + ev.waitMax - i.total} 位` : `剩 ${i.left} 個名額`}</div><button class="btn" data-join="${ev.id}">${i.isWait ? '加入候補' : '+1 接龍'}</button>`;
+  else if(i.flopped) cta = `<div class="left"><b>活動已流標</b><br>下次再一起出走 🙏</div>`;
   else if(i.ended) cta = `<div class="left"><b>活動已結束</b></div>`;
   else cta = `<div class="left"><b>${ev.waitMax ? '已滿團，候補也滿了' : '已滿團'}</b><br>下次早點來 🙏</div><button class="btn" disabled>已滿團</button>`;
 
@@ -989,20 +993,20 @@ async function saveAbout(btn){
 const REVIEW_LABEL = { pending:'待審核', rejected:'已退回' };
 function renderEvents(){
   const n = (st)=>state.events.filter(e=>e.status===st).length;
-  const filters = [['all','全部',state.events.length],['open','上架中',n('open')],['pending','待審核',n('pending')],['rejected','已退回',n('rejected')]];
+  const filters = [['all','全部',state.events.length],['open','上架中',n('open')],['pending','待審核',n('pending')],['rejected','已退回',n('rejected')],['cancelled','已流標',n('cancelled')]];
   $('#eventFilters').innerHTML = filters.map(([k,label,c])=>`<button class="tab ${ui.efilter===k?'on':''}" data-efilter="${k}">${label} ${k==='pending' && c ? `<span class="count-badge">${c}</span>` : `<span class="n">${c}</span>`}</button>`).join('');
   const rows = state.events.filter(e=>ui.efilter==='all' || e.status===ui.efilter).sort((a,b)=>a.date.localeCompare(b.date));
-  const emptyText = { all:'還沒有活動，按右上角「新增活動」', open:'還沒有活動，按右上角「新增活動」', pending:'目前沒有待審核的自揪申請 🎉', rejected:'沒有退回的申請' }[ui.efilter];
+  const emptyText = { all:'還沒有活動，按右上角「新增活動」', open:'還沒有活動，按右上角「新增活動」', pending:'目前沒有待審核的自揪申請 🎉', rejected:'沒有退回的申請', cancelled:'沒有流標的活動' }[ui.efilter];
   $('#adminRows').innerHTML = rows.length ? rows.map(ev=>{
     const i=info(ev), c=CATS[ev.cat];
-    const review = ev.status !== 'open';
+    const review = ev.status === 'pending' || ev.status === 'rejected';
     const who = ev.proposer ? `<div class="sub">申請人：${esc(ev.proposer)}${ev.submittedAt ? `・${fmtTime(ev.submittedAt)}` : ''}</div>` : '';
     return `<tr>
       <td>${fmtDate(ev.date)}<div class="sub">${esc(ev.time)}</div></td>
       <td><div class="t">${ev.images.length ? '🖼 ' : ''}${esc(ev.title)}</div><div class="sub">${money(ev.price)}・${esc(ev.host)}</div>${review ? who : ''}</td>
       <td><span class="chip" style="background:${c.color}">${c.name}</span></td>
       <td style="min-width:150px">${review ? `<div class="sub">名額 ${ev.capacity}・${ev.threshold} 人成團</div>` : progress(ev,i)}</td>
-      <td><span class="badge ${review ? (ev.status==='pending' ? 'review' : 'rejected') : i.cls}">${review ? REVIEW_LABEL[ev.status] : i.status}</span>${ev.status==='rejected' && ev.reviewNote ? `<div class="sub" style="margin-top:4px">${esc(ev.reviewNote)}</div>` : ''}</td>
+      <td><span class="badge ${review ? (ev.status==='pending' ? 'review' : 'rejected') : i.cls}">${review ? REVIEW_LABEL[ev.status] : i.status}</span>${ev.status==='rejected' && ev.reviewNote ? `<div class="sub" style="margin-top:4px">${esc(ev.reviewNote)}</div>` : ''}${ev.status==='cancelled' && ev.cancelReason ? `<div class="sub" style="margin-top:4px">${esc(ev.cancelReason)}</div>` : ''}</td>
       <td><div class="actions">${review
         ? `${ev.status==='pending' ? `<button class="btn sm" data-review="${ev.id}">審核</button>` : `<button class="btn ghost sm" data-review="${ev.id}">查看</button>`}
            <button class="btn ghost sm" data-edit="${ev.id}">編輯</button>`
@@ -1011,6 +1015,76 @@ function renderEvents(){
            <button class="btn ghost sm" data-copy="${ev.id}" title="用這場的內容建立新活動">複製</button>`}
       </div></td></tr>`;
   }).join('') : `<tr><td colspan="6" class="sub" style="text-align:center;padding:30px">${emptyText}</td></tr>`;
+}
+
+/* ---------- 刪除、流標（會用 LINE 通知接龍的人） ---------- */
+function whoHtml(ev){
+  const main = Math.min(ev.signups.length, ev.capacity), wait = ev.signups.length - main;
+  return `${main} 人${wait ? `＋候補 ${wait} 人` : ''}`;
+}
+function openDelete(id){
+  const ev = findEv(id); if(!ev) return;
+  const notify = ev.signups.length > 0 && ev.date >= todayKey && ev.status === 'open';
+  openModal(`<div class="sheet-head"><h2>刪除活動</h2><button class="close" data-close aria-label="關閉">×</button>
+      <div class="sub">${esc(ev.title)}・${fmtDate(ev.date)} ${esc(ev.time)}</div></div>
+    <div class="sec">
+      ${notify ? `<div class="callout warn">📩<div><b>這場有 ${whoHtml(ev)}接龍</b>刪除後會用 LINE 通知他們活動取消和原因；已付款的人會另外收到「管理員會聯繫退款」。</div></div>
+        <label class="field" style="margin-top:14px"><span>取消原因 <em>（必填，會出現在 LINE 通知裡）</em></span>
+          <textarea class="input" id="delReason" rows="2" maxlength="300" placeholder="例如：老師臨時生病，這堂課取消"></textarea></label>
+        <div class="field"><span>通知預覽</span><div class="msg-preview" id="delPreview"></div></div>`
+      : `<div class="callout info">💡<div>${ev.signups.length ? '這場已經結束（或已流標），' : '這場沒有人接龍，'}刪除不會發 LINE 通知。</div></div>`}
+      ${ev.status==='open' && ev.date >= todayKey && ev.signups.length && ev.signups.length < ev.threshold ? `<div class="hint">還沒成團想取消？也可以按「流標」：活動會保留並顯示「已流標」，一樣會通知接龍的人。</div>` : ''}
+      <div class="hint">刪除後無法復原，接龍名單也會一起刪除。</div>
+      <div class="err" id="delErr"></div>
+    </div>
+    <div class="sticky-cta"><button class="btn ghost" data-edit="${id}">返回</button><div class="left"></div><button class="btn danger" data-dodel="${id}">確定刪除</button></div>`);
+  const r = $('#delReason');
+  if(r){
+    const upd = ()=>{ $('#delPreview').textContent = `❌【活動取消】${ev.title}\n${fmtDate(ev.date)} ${ev.time}\n原因：${r.value.trim() || '（請填寫）'}\n\n謝謝你的接龍，下次見！`; };
+    r.addEventListener('input', upd); upd(); setTimeout(()=>r.focus(), 50);
+  }
+}
+async function doDelete(id, btn){
+  const r = $('#delReason'), reason = r ? r.value.trim() : '';
+  if(r && !reason){ $('#delErr').textContent = '請填寫取消原因，接龍的人會在 LINE 上看到'; r.focus(); return; }
+  btn.disabled = true;
+  try{
+    const res = await api('admin_delete_activity', { id, reason });
+    await loadData(); closeModal(); render();
+    toast(res.notified ? `已刪除，並用 LINE 通知 ${res.notified} 位接龍的人` : '已刪除');
+  }catch(e){
+    btn.disabled = false;
+    if(e.status!==401) $('#delErr').textContent = e.code==='reason_required' ? '請填寫取消原因' : '刪除失敗：' + e.code;
+  }
+}
+function openFlop(id){
+  const ev = findEv(id); if(!ev) return;
+  const i = info(ev);
+  openModal(`<div class="sheet-head"><h2>宣告流標</h2><button class="close" data-close aria-label="關閉">×</button>
+      <div class="sub">${esc(ev.title)}・${fmtDate(ev.date)} ${esc(ev.time)}</div></div>
+    <div class="sec">
+      <div class="callout ${i.reached ? 'go' : 'warn'}">${i.reached ? '✅' : '⚠️'}<div><b>目前 ${i.n} / 門檻 ${ev.threshold} 人${i.reached ? '，已經成團了' : `，還差 ${ev.threshold - i.n} 人`}</b>
+        流標後活動會保留並顯示「已流標」，不能再接龍${ev.signups.length ? `；接龍的 ${whoHtml(ev)}會收到 LINE 通知，已付款的人會另外收到「管理員會聯繫退款」` : '；目前沒有人接龍，不會發通知'}。</div></div>
+      <label class="field" style="margin-top:14px"><span>補充說明 <em>（選填，會出現在 LINE 通知裡）</em></span>
+        <textarea class="input" id="flopReason" rows="2" maxlength="300" placeholder="例如：下個月會再開一次，歡迎再來接龍"></textarea></label>
+      ${ev.signups.length ? '<div class="field"><span>通知預覽</span><div class="msg-preview" id="flopPreview"></div></div>' : ''}
+      <div class="err" id="flopErr"></div>
+    </div>
+    <div class="sticky-cta"><button class="btn ghost" data-close>再等等</button><div class="left"></div><button class="btn danger" data-doflop="${id}">確定流標</button></div>`);
+  const r = $('#flopReason'), pv = $('#flopPreview');
+  const upd = ()=>{ if(pv) pv.textContent = `😢【活動流標】${ev.title}\n${fmtDate(ev.date)} ${ev.time}\n很可惜沒有達到 ${ev.threshold} 人開班門檻，這次活動取消。${r.value.trim() ? `\n說明：${r.value.trim()}` : ''}\n\n謝謝你的接龍，下次見！`; };
+  r.addEventListener('input', upd); upd();
+}
+async function doFlop(id, btn){
+  btn.disabled = true;
+  try{
+    const res = await api('admin_cancel_activity', { id, reason: $('#flopReason').value.trim() });
+    await loadData(); closeModal(); render();
+    toast(res.notified ? `已流標，並用 LINE 通知 ${res.notified} 位接龍的人` : '已流標');
+  }catch(e){
+    btn.disabled = false;
+    if(e.status!==401) $('#flopErr').textContent = e.code==='not_open' ? '這場已經不是上架中的活動了' : '操作失敗：' + e.code;
+  }
 }
 
 /* ---------- 社員自揪：審核（管理員） ---------- */
@@ -1148,7 +1222,7 @@ async function openRoster(id){
     const row = (s,k)=>{
       const wait = k >= ev.capacity;
       return `<li><span class="sub" style="min-width:44px">${wait ? `候補${k - ev.capacity + 1}` : k+1}</span>${av(s.nickname)}
-        <span style="flex:1;min-width:0">${esc(s.nickname)}${s.option ? `<span class="sub">（${esc(s.option)}）</span>` : ''}
+        <span style="flex:1;min-width:0">${esc(s.nickname)}${s.promoted_at && !wait ? ` <span class="badge full" title="${fmtTime(s.promoted_at)} 從候補遞補">遞補</span>` : ''}${s.option ? `<span class="sub">（${esc(s.option)}）</span>` : ''}
           <div class="meta">${s.line_name ? `LINE：${esc(s.line_name)}・` : ''}${fmtTime(s.created_at)}${s.note ? `<br><b>備註：</b>${esc(s.note)}` : ''}</div></span>
         ${wait ? '' : `<label class="paid-toggle"><input type="checkbox" data-paid="${esc(s.id)}" ${s.paid ? 'checked' : ''}>已付款</label>`}
         <button class="btn danger sm" data-rm="${id}|${esc(s.id)}" data-who="${esc(s.nickname)}">移除</button></li>`;
@@ -1203,7 +1277,7 @@ function openEdit(id, copyFrom, propose){
       </div>
       <div class="err" id="fErr"></div>
     </form>
-    <div class="sticky-cta">${id && !propose ? `<button class="btn danger" data-del="${id}">刪除</button>` : ''}<div class="left"></div>${propose
+    <div class="sticky-cta">${id && !propose ? `<button class="btn danger" data-del="${id}">刪除</button>` : ''}${id && !propose && ev.status==='open' && ev.date >= todayKey ? `<button class="btn ghost" data-flop="${id}" title="沒達到開班門檻，取消這場並通知接龍的人">流標</button>` : ''}<div class="left"></div>${propose
       ? `<button class="btn" data-sendprop="${id||''}" style="background:var(--c-member)">${id ? '儲存並送審' : '送出申請'}</button>`
       : `<button class="btn" data-save="${id||''}">儲存</button>`}</div>`);
   renderImgSlots();
@@ -1298,7 +1372,7 @@ async function doExport(btn){
     signups.forEach(s=>{ (by[s.activity_id] ||= []).push(s); });
     const wk = (d)=>WEEK[parseD(d).getDay()];
     const sheet1 = [['日期','星期','時間','類別','活動名稱','帶領 / 揪團人','地點','費用','價格說明','名額','開班門檻','候補上限','正取人數','候補人數','已付款','狀態','方案','預約付款連結']];
-    const sheet2 = [['日期','活動名稱','順序','正取 / 候補','社群暱稱','LINE 名稱','方案','給管理員的備註','已付款','接龍時間']];
+    const sheet2 = [['日期','活動名稱','順序','正取 / 候補','社群暱稱','LINE 名稱','方案','給管理員的備註','已付款','接龍時間','遞補時間']];
     evs.forEach(ev=>{
       const rs = by[ev.id] || [], i = info(ev);
       const main = rs.slice(0, ev.capacity), wait = rs.slice(ev.capacity);
@@ -1306,7 +1380,7 @@ async function doExport(btn){
         main.length, wait.length, main.filter(s=>s.paid).length, i.status, ev.options.join(' / '), ev.booking]);
       rs.forEach((s,k)=>{
         const w = k >= ev.capacity;
-        sheet2.push([ev.date, ev.title, w ? k - ev.capacity + 1 : k + 1, w ? '候補' : '正取', s.nickname||'', s.line_name||'', s.option||'', s.note||'', w ? '' : (s.paid ? '是' : '否'), new Date(s.created_at).toLocaleString('zh-TW', { hour12:false })]);
+        sheet2.push([ev.date, ev.title, w ? k - ev.capacity + 1 : k + 1, w ? '候補' : '正取', s.nickname||'', s.line_name||'', s.option||'', s.note||'', w ? '' : (s.paid ? '是' : '否'), new Date(s.created_at).toLocaleString('zh-TW', { hour12:false }), s.promoted_at && !w ? new Date(s.promoted_at).toLocaleString('zh-TW', { hour12:false }) : '']);
       });
     });
     const wb = XLSX.utils.book_new();
@@ -1318,7 +1392,7 @@ async function doExport(btn){
       XLSX.utils.book_append_sheet(wb, ws, name);
     };
     add(sheet1, '活動總表', [11,5,12,10,28,14,18,8,14,6,8,8,8,8,7,18,24,30]);
-    add(sheet2, '接龍名單', [11,28,6,10,12,16,20,24,7,18]);
+    add(sheet2, '接龍名單', [11,28,6,10,12,16,20,24,7,18,18]);
     XLSX.writeFile(wb, `agoodwayout_activities_${todayKey}.xlsx`);   // 英文檔名：部分瀏覽器不支援中文下載檔名
     closeModal(); toast(`已下載 ${evs.length} 場活動、${signups.length} 筆接龍`);
   }catch(e){
@@ -1345,7 +1419,7 @@ function closeModal(force){
 
 /* ---------- 事件 ---------- */
 document.addEventListener('click', async e=>{
-  const t = e.target.closest('[data-efilter],[data-review],[data-decide],[data-propose],[data-withdraw],[data-sendprop],[data-imgadd],[data-imgrm],[data-doexport],[data-paid],[data-copy],[data-adddate],[data-view],[data-mfilter],[data-mset],[data-madmin],[data-recheck],[data-day],[data-dayclear],[data-mode],[data-cat],[data-open],[data-close],[data-overlay],[data-join],[data-roster],[data-rm],[data-edit],[data-save],[data-del],[data-editnick],[data-savenick]');
+  const t = e.target.closest('[data-dodel],[data-flop],[data-doflop],[data-efilter],[data-review],[data-decide],[data-propose],[data-withdraw],[data-sendprop],[data-imgadd],[data-imgrm],[data-doexport],[data-paid],[data-copy],[data-adddate],[data-view],[data-mfilter],[data-mset],[data-madmin],[data-recheck],[data-day],[data-dayclear],[data-mode],[data-cat],[data-open],[data-close],[data-overlay],[data-join],[data-roster],[data-rm],[data-edit],[data-save],[data-del],[data-editnick],[data-savenick]');
   if(!t) return;
   const d = t.dataset;
   if(d.overlay!==undefined && e.target!==t) return;
@@ -1408,17 +1482,16 @@ document.addEventListener('click', async e=>{
     const [aid, sid] = d.rm.split('|');
     if(!confirm(`確定把「${d.who}」從名單移除？`)) return;
     t.disabled = true;
-    try{ await api('admin_remove_signup', { signupId:sid }); await loadData(); render(); openRoster(aid); toast('已移除'); }
+    try{ const r = await api('admin_remove_signup', { signupId:sid }); await loadData(); render(); openRoster(aid);
+      toast(r.promoted ? `已移除，候補「${r.promoted}」遞補為正取，已用 LINE 通知付款` : '已移除'); }
     catch(err){ t.disabled = false; if(err.status!==401) toast('移除失敗，請稍後再試'); }
   }
   else if(d.edit) openEdit(d.edit);
   else if(d.save!==undefined) saveEvent(d.save, t);
-  else if(d.del){
-    if(!confirm('確定刪除這個活動？接龍名單也會一起刪除。')) return;
-    t.disabled = true;
-    try{ await api('admin_delete_activity', { id:d.del }); await loadData(); closeModal(); render(); toast('已刪除'); }
-    catch(err){ t.disabled = false; if(err.status!==401) toast('刪除失敗，請稍後再試'); }
-  }
+  else if(d.del) openDelete(d.del);
+  else if(d.dodel) doDelete(d.dodel, t);
+  else if(d.flop) openFlop(d.flop);
+  else if(d.doflop) doFlop(d.doflop, t);
 });
 document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeModal(); });
 
@@ -1484,11 +1557,12 @@ function openFromLink(){
     render(); loadMembers().then(render).catch(()=>{});
   };
   if(page==='review' && admin) toReview('pending');
+  else if(page==='events' && admin){ toReview('all'); if(ev && findEv(ev)) openFlop(ev); }   // 「即將流標」提醒的連結
   else if(page==='proposals') openMyProposals();
   else if(ev){
     const e = findEv(ev);
     if(!e) toast('找不到這個活動，可能已經刪除了');
-    else if(e.status==='open') openDetail(ev);
+    else if(e.status==='open' || e.status==='cancelled') openDetail(ev);
     else if(admin){ toReview(e.status); openReview(ev); }
     else openMyProposals();
   }

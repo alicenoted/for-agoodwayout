@@ -23,6 +23,10 @@ const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
 const IMG_PATH = /^act\/[0-9a-f-]{36}\.(jpg|png|webp)$/;
 const MAX_PENDING_PROPOSALS = 5;   // 每人同時最多幾個「待審核」的自揪申請
 
+// 每日排程（Supabase pg_cron 每天早上呼叫一次 action: "cron_daily"）用的密碼，存在 Edge Function Secrets
+const CRON_SECRET = Deno.env.get("CRON_SECRET") ?? "";
+const FLOP_WARN_DAYS = Number(Deno.env.get("FLOP_WARN_DAYS") ?? "7");   // 活動前幾天還沒成團就提醒管理員「即將流標」
+
 // 允許呼叫這個 API 的網站
 const ALLOWED_ORIGINS = [
   "https://alicenoted.github.io",
@@ -183,7 +187,7 @@ async function mySignupIds(memberId: string): Promise<string[]> {
 }
 
 const ACT_FIELDS =
-  "id, category, title, host_name, event_date, time_text, place, price, price_note, capacity, threshold, description, booking_url, options, wait_max, images, status, created_by, review_note, reviewed_at, created_at";
+  "id, category, title, host_name, event_date, time_text, place, price, price_note, capacity, threshold, description, booking_url, options, wait_max, images, status, created_by, review_note, reviewed_at, created_at, cancel_reason";
 
 // 圖片沒有任何活動在用了才真的刪掉（「複製活動」會共用同一張圖）
 async function cleanupImages(paths: string[]) {
@@ -250,51 +254,178 @@ function fmtWhen(a: { event_date: string; time_text: string | null }) {
   return `${d.getUTCMonth() + 1}/${d.getUTCDate()}（${week}）${a.time_text ? " " + a.time_text : ""}`;
 }
 const evLink = (id: string) => `${LIFF_URL}?ev=${id}`;
+const twToday = () => new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 10);   // 台灣日期
+
+const NOTIFY_FIELDS = "id, title, event_date, time_text, capacity, threshold, wait_max, price, price_note, booking_url, category, created_by, status";
+type NotifyAct = {
+  id: string; title: string; event_date: string; time_text: string | null; capacity: number; threshold: number;
+  wait_max: number; price: number; price_note: string | null; booking_url: string | null; category: string;
+  created_by: string | null; status: string;
+};
+
+// 付款說明（成團通知、成團後接龍、候補遞補共用）
+function payText(a: NotifyAct) {
+  const price = a.price ? `$${Number(a.price).toLocaleString("en-US")}${a.price_note ? `（${a.price_note}）` : ""}` : "免費";
+  const how = a.booking_url
+    ? `請在活動前 7 天完成預約付款（以付款順序為準）：\n${a.booking_url}`
+    : a.category === "member"
+    ? "付款方式請留意揪團人在 LINE 社群的說明。"
+    : "管理員會在 LINE 社群公告付款方式，請留意訊息。";
+  return `費用：${price}\n${how}`;
+}
+
+// 管理員（社員自揪的活動再加揪團人）
+async function staffLineIds(a: { category: string; created_by: string | null }) {
+  const ids = await adminLineIds();
+  if (a.category === "member") ids.push((await lineIdOf(a.created_by)) ?? "");
+  return ids;
+}
+
+// 有效的接龍，依時間排序（前 capacity 位是正取，之後是候補）
+async function activeSignups(activityId: string) {
+  return await fetchAll<any>(() =>
+    db.from("signups")
+      .select("id, member_id, created_at, paid, members(nickname, line_user_id, line_display_name)")
+      .eq("activity_id", activityId).is("cancelled_at", null)
+      .order("created_at").order("id")
+  );
+}
 
 // 人數達到開班門檻時發「成團通知」：正取的團員（請匯款）＋管理員（＋社員自揪的揪團人）。
 // 用 reached_notified_at 鎖住，同一場只會發一次（兩人同時接龍、之後有人取消再補上都不會重發）。
-async function maybeNotifyReached(activityId: string) {
+async function maybeNotifyReached(activityId: string): Promise<boolean> {
+  if (!LINE_MESSAGING_TOKEN) return false;
+  const { data: pre } = await db.from("activities")
+    .select("threshold, status, reached_notified_at").eq("id", activityId).maybeSingle();
+  if (!pre || pre.status !== "open" || pre.reached_notified_at) return false;
+  const list = await activeSignups(activityId);
+  if (list.length < pre.threshold) return false;
+
+  const { data: a } = await db.from("activities")
+    .update({ reached_notified_at: new Date().toISOString() })
+    .eq("id", activityId).is("reached_notified_at", null)
+    .select(NOTIFY_FIELDS).maybeSingle<NotifyAct>();
+  if (!a) return false;   // 別的請求已經發過了
+
+  await pushLine(
+    list.slice(0, a.capacity).map((s) => s.members?.line_user_id),
+    `🎉【成團通知】${a.title}\n${fmtWhen(a)}\n已達 ${a.threshold} 人開班門檻，活動確定舉行！\n${payText(a)}\n\n活動頁：${evLink(a.id)}`,
+  );
+  await pushLine(
+    await staffLineIds(a),
+    `✅【成團】${a.title}\n${fmtWhen(a)}・目前 ${Math.min(list.length, a.capacity)}／${a.capacity} 人（門檻 ${a.threshold} 人）\n` +
+      (a.booking_url ? "團員已收到預約付款通知。" : "這場沒有預約付款連結，請到 LINE 社群公告付款方式。") +
+      `\n每天早上會傳「今日待付款名單」給管理員。\n${evLink(a.id)}`,
+  );
+  return true;
+}
+
+// 名額剛好滿了：通知管理員（＋揪團人）一次，之後才開放候補
+async function maybeNotifyFull(activityId: string) {
   if (!LINE_MESSAGING_TOKEN) return;
+  const { data: pre } = await db.from("activities").select("capacity, status, full_notified_at").eq("id", activityId).maybeSingle();
+  if (!pre || pre.status !== "open" || pre.full_notified_at) return;
+  const { count } = await db.from("signups")
+    .select("id", { count: "exact", head: true }).eq("activity_id", activityId).is("cancelled_at", null);
+  if ((count ?? 0) < pre.capacity) return;
+  const { data: a } = await db.from("activities")
+    .update({ full_notified_at: new Date().toISOString() })
+    .eq("id", activityId).is("full_notified_at", null)
+    .select(NOTIFY_FIELDS).maybeSingle<NotifyAct>();
+  if (!a) return;
+  await pushLine(
+    await staffLineIds(a),
+    `📣【滿團】${a.title}\n${fmtWhen(a)}\n名額 ${a.capacity} 人已滿${a.wait_max ? `，接下來開放候補 ${a.wait_max} 位` : "（沒有開放候補）"}。\n想參加的人多，可以考慮加開一場。\n${evLink(a.id)}`,
+  );
+}
+
+// 接龍之後：剛好成團 → 成團通知；已經成團後才接龍（正取）→ 通知這個人付款；剛好滿團 → 通知管理員
+async function afterJoin(activityId: string, memberId: string) {
   try {
-    const { data: pre } = await db.from("activities")
-      .select("threshold, status, reached_notified_at").eq("id", activityId).maybeSingle();
-    if (!pre || pre.status !== "open" || pre.reached_notified_at) return;
-    const { count } = await db.from("signups")
-      .select("id", { count: "exact", head: true }).eq("activity_id", activityId).is("cancelled_at", null);
-    if ((count ?? 0) < pre.threshold) return;
-
-    const { data: a } = await db.from("activities")
-      .update({ reached_notified_at: new Date().toISOString() })
-      .eq("id", activityId).is("reached_notified_at", null)
-      .select("id, title, event_date, time_text, capacity, threshold, price, price_note, booking_url, category, created_by")
-      .maybeSingle();
-    if (!a) return;   // 別的請求已經發過了
-
-    const { data: main } = await db.from("signups")
-      .select("members(line_user_id)")
-      .eq("activity_id", activityId).is("cancelled_at", null)
-      .order("created_at").limit(a.capacity);
-    const price = a.price ? `$${Number(a.price).toLocaleString("en-US")}${a.price_note ? `（${a.price_note}）` : ""}` : "免費";
-    const pay = a.booking_url
-      ? `請在活動前 7 天完成預約付款（以付款順序為準）：\n${a.booking_url}`
-      : a.category === "member"
-      ? "付款方式請留意揪團人在 LINE 社群的說明。"
-      : "管理員會在 LINE 社群公告付款方式，請留意訊息。";
-    await pushLine(
-      (main ?? []).map((s: any) => s.members?.line_user_id),
-      `🎉【成團通知】${a.title}\n${fmtWhen(a)}\n已達 ${a.threshold} 人開班門檻，活動確定舉行！\n費用：${price}\n${pay}\n\n活動頁：${evLink(a.id)}`,
-    );
-    const staff = await adminLineIds();
-    if (a.category === "member") staff.push((await lineIdOf(a.created_by)) ?? "");
-    await pushLine(
-      staff,
-      `✅【成團】${a.title}\n${fmtWhen(a)}・目前 ${count}／${a.capacity} 人（門檻 ${a.threshold} 人）\n` +
-        (a.booking_url ? "團員已收到預約付款通知。" : "這場沒有預約付款連結，請到 LINE 社群公告付款方式。") +
-        `\n${evLink(a.id)}`,
-    );
+    const justReached = await maybeNotifyReached(activityId);
+    if (!justReached && LINE_MESSAGING_TOKEN) {
+      const { data: a } = await db.from("activities").select(`${NOTIFY_FIELDS}, reached_notified_at`).eq("id", activityId).maybeSingle();
+      if (a?.reached_notified_at) {
+        const list = await activeSignups(activityId);
+        const idx = list.findIndex((s) => s.member_id === memberId);
+        if (idx >= 0 && idx < a.capacity) {
+          await pushLine(
+            [list[idx].members?.line_user_id],
+            `🎉【接龍成功・請付款】${a.title}\n${fmtWhen(a)}\n這場已經成團，你是正取第 ${idx + 1} 位。\n${payText(a)}\n\n活動頁：${evLink(a.id)}`,
+          );
+        }
+      }
+    }
+    await maybeNotifyFull(activityId);
   } catch (e) {
-    console.error("maybeNotifyReached error", e);
+    console.error("afterJoin notify error", e);
   }
+}
+
+// 活動流標或刪除時，通知所有接龍的人（正取＋候補）；已付款的人另外說明退款
+async function notifyCancelled(a: NotifyAct, list: any[], head: string, reasonLine: string) {
+  const base = `${head}${a.title}\n${fmtWhen(a)}\n${reasonLine}`;
+  const paid = list.filter((s, i) => i < a.capacity && s.paid);
+  const unpaid = list.filter((s, i) => !(i < a.capacity && s.paid));
+  await pushLine(unpaid.map((s) => s.members?.line_user_id), `${base}\n\n謝謝你的接龍，下次見！`);
+  await pushLine(paid.map((s) => s.members?.line_user_id), `${base}\n\n你已付款的費用，管理員會另外聯繫你辦理退款。造成不便很抱歉。`);
+}
+
+// 每日排程：即將流標提醒＋今日待付款名單（台灣時間早上執行）
+async function runDaily() {
+  const today = twToday();
+  const out = { flopWarned: 0, digestSent: false, unpaid: 0 };
+  if (!LINE_MESSAGING_TOKEN) return out;
+  const acts = await fetchAll<any>(() =>
+    db.from("activities").select(`${NOTIFY_FIELDS}, reached_notified_at, flop_warned_at`)
+      .eq("status", "open").gte("event_date", today).order("event_date")
+  );
+  const lists: Record<string, any[]> = {};
+  for (const a of acts) lists[a.id] = await activeSignups(a.id);
+
+  // 1. 即將流標：活動前 FLOP_WARN_DAYS 天內還沒到開班門檻，提醒管理員（＋揪團人）一次
+  const limit = new Date(Date.parse(today + "T00:00:00Z") + FLOP_WARN_DAYS * 86400_000).toISOString().slice(0, 10);
+  for (const a of acts) {
+    const n = lists[a.id].length;
+    if (a.flop_warned_at || n >= a.threshold || a.event_date > limit) continue;
+    const { data: locked } = await db.from("activities").update({ flop_warned_at: new Date().toISOString() })
+      .eq("id", a.id).is("flop_warned_at", null).select("id").maybeSingle();
+    if (!locked) continue;
+    const days = Math.round((Date.parse(a.event_date) - Date.parse(today)) / 86400_000);
+    await pushLine(
+      await staffLineIds(a),
+      `⚠️【即將流標】${a.title}\n${fmtWhen(a)}（還有 ${days} 天）\n目前 ${n}／門檻 ${a.threshold} 人，還差 ${a.threshold - n} 人。\n` +
+        `要流標請到後台「活動管理」打開這場按「流標」，系統會通知接龍的人；想再等等就不用動作。\n${LIFF_URL}?page=events&ev=${a.id}`,
+    );
+    out.flopWarned++;
+  }
+
+  // 2. 今日待付款名單：已成團、還沒舉行的活動裡，正取但還沒勾「已付款」的人（一天只發一次）
+  const blocks: string[] = [];
+  for (const a of acts) {
+    const list = lists[a.id];
+    if (list.length < a.threshold) continue;
+    const due = list.slice(0, a.capacity).filter((s) => !s.paid);
+    if (!due.length) continue;
+    out.unpaid += due.length;
+    blocks.push(`▸ ${fmtWhen(a)} ${a.title}（${due.length} 人）\n` +
+      due.map((s) => `　${s.members?.nickname ?? "?"}${s.members?.line_display_name ? `（LINE：${s.members.line_display_name}）` : ""}`).join("\n"));
+  }
+  if (blocks.length) {
+    const { error } = await db.from("notify_log").insert({ key: `digest:${today}` });
+    if (!error) {   // 主鍵重複＝今天已經發過
+      let body = "";
+      for (const [i, b] of blocks.entries()) {
+        if ((body + b).length > 4000) { body += `\n…還有 ${blocks.length - i} 場，請到後台查看`; break; }
+        body += (body ? "\n\n" : "") + b;
+      }
+      const [, m, d] = today.split("-").map(Number);
+      await pushLine(await adminLineIds(),
+        `💰【今日待付款名單】${m}/${d}\n共 ${out.unpaid} 人還沒付款\n\n${body}\n\n收到款項後，請到後台名單勾「已付款」。\n${LIFF_URL}?page=events`);
+      out.digestSent = true;
+    }
+  }
+  return out;
 }
 
 // 只回傳給前端需要的欄位；review_note 只給管理員和申請人本人
@@ -305,6 +436,7 @@ function activityOut(a: any, viewer: Member) {
     time_text: a.time_text, place: a.place, price: a.price, price_note: a.price_note, capacity: a.capacity,
     threshold: a.threshold, description: a.description, booking_url: a.booking_url, options: a.options,
     wait_max: a.wait_max, images: a.images ?? [], status: a.status, mine_created: own,
+    cancel_reason: a.cancel_reason ?? null,
     ...(viewer.is_admin || own
       ? { review_note: a.review_note, reviewed_at: a.reviewed_at, created_at: a.created_at }
       : {}),
@@ -335,7 +467,8 @@ async function handle(body: Record<string, unknown>) {
       const m = requireApproved(member);
       const since = new Date(Date.now() - 180 * 86400_000).toISOString().slice(0, 10);
       // 管理員也拿得到「待審核／已退回」的社員自揪申請
-      const statuses = m.is_admin ? ["open", "pending", "rejected"] : ["open"];
+      // 流標（cancelled）的活動也列出來，讓接龍過的人看得到原因
+      const statuses = m.is_admin ? ["open", "cancelled", "pending", "rejected"] : ["open", "cancelled"];
       const activities = await fetchAll<any>(() =>
         db.from("activities")
           .select(`${ACT_FIELDS}, creator:members!activities_created_by_fkey(nickname, line_display_name)`)
@@ -351,7 +484,7 @@ async function handle(body: Record<string, unknown>) {
         .in("status", ["pending", "rejected"])
         .order("created_at", { ascending: false });
       if (mineErr) throw mineErr;
-      const ids = activities.filter((a) => a.status === "open").map((a) => a.id);
+      const ids = activities.filter((a) => a.status === "open" || a.status === "cancelled").map((a) => a.id);
       const signups = ids.length
         ? await fetchAll<any>(() =>
           db.from("signups")
@@ -399,7 +532,7 @@ async function handle(body: Record<string, unknown>) {
         p_note: note,
       });
       if (error) throw error;
-      if (data === "ok" || data === "reached") await background(maybeNotifyReached(activityId));
+      if (data === "ok" || data === "reached") await background(afterJoin(activityId, m.id));
       return { result: data }; // ok / reached / waitlist / full / already_joined / not_found
     }
 
@@ -513,7 +646,7 @@ async function handle(body: Record<string, unknown>) {
       for (let i = 0; i < ids.length; i += 100) {
         rows.push(...await fetchAll<any>(() =>
           db.from("signups")
-            .select("activity_id, created_at, option, note, paid, members(nickname, line_display_name)")
+            .select("activity_id, created_at, option, note, paid, promoted_at, members(nickname, line_display_name)")
             .in("activity_id", ids.slice(i, i + 100))
             .is("cancelled_at", null)
             .order("created_at")
@@ -529,6 +662,7 @@ async function handle(body: Record<string, unknown>) {
           option: r.option,
           note: r.note,
           paid: r.paid,
+          promoted_at: r.promoted_at,
         })),
       };
     }
@@ -543,7 +677,7 @@ async function handle(body: Record<string, unknown>) {
         const { error } = await db.from("activities").update(a).eq("id", id);
         if (error) throw error;
         await cleanupImages((old.images ?? []).filter((p: string) => !a.images.includes(p)));
-        await background(maybeNotifyReached(id));   // 例如把門檻調低後剛好成團
+        await background(maybeNotifyReached(id).then(() => maybeNotifyFull(id)).catch((e) => console.error(e)));   // 例如把門檻調低後剛好成團
         return { ok: true, created: 0 };
       }
       // 新增時可以一次給多個日期（同一份內容，每個日期一場）
@@ -555,21 +689,45 @@ async function handle(body: Record<string, unknown>) {
       return { ok: true, created: dates.length };
     }
 
+    // 刪除活動：還沒舉行、有人接龍時要填原因，並用 LINE 通知所有接龍的人
     case "admin_delete_activity": {
       requireAdmin(member);
       const id = String(body.id ?? "");
-      const { data: old } = await db.from("activities").select("images").eq("id", id).maybeSingle();
+      const reason = typeof body.reason === "string" ? body.reason.trim().slice(0, 300) : "";
+      const { data: old } = await db.from("activities").select(`${NOTIFY_FIELDS}, images`).eq("id", id).maybeSingle();
+      if (!old) throw new ApiError(404, "not_found");
+      const list = await activeSignups(id);
+      const notify = list.length > 0 && old.event_date >= twToday() && old.status === "open";
+      if (notify && !reason) throw new ApiError(400, "reason_required");
       const { error } = await db.from("activities").delete().eq("id", id);
       if (error) throw error;
-      await cleanupImages(old?.images ?? []);
-      return { ok: true };
+      await cleanupImages(old.images ?? []);
+      if (notify) await background(notifyCancelled(old, list, "❌【活動取消】", `原因：${reason}`).catch((e) => console.error(e)));
+      return { ok: true, notified: notify ? list.length : 0 };
+    }
+
+    // 流標：活動保留（顯示「已流標」），通知所有接龍的人
+    case "admin_cancel_activity": {
+      requireAdmin(member);
+      const id = String(body.id ?? "");
+      const reason = typeof body.reason === "string" ? body.reason.trim().slice(0, 300) || null : null;
+      const { data: a, error } = await db.from("activities")
+        .update({ status: "cancelled", cancel_reason: reason, cancelled_at: new Date().toISOString() })
+        .eq("id", id).eq("status", "open")
+        .select(NOTIFY_FIELDS).maybeSingle<NotifyAct>();
+      if (error) throw error;
+      if (!a) throw new ApiError(409, "not_open");
+      const list = await activeSignups(id);
+      await background(notifyCancelled(a, list, "😢【活動流標】",
+        `很可惜沒有達到 ${a.threshold} 人開班門檻，這次活動取消。${reason ? `\n說明：${reason}` : ""}`).catch((e) => console.error(e)));
+      return { ok: true, notified: list.length };
     }
 
     case "admin_roster": {
       requireAdmin(member);
       const { data, error } = await db
         .from("signups")
-        .select("id, created_at, option, note, paid, members(nickname, line_display_name)")
+        .select("id, created_at, option, note, paid, promoted_at, members(nickname, line_display_name)")
         .eq("activity_id", String(body.activityId ?? ""))
         .is("cancelled_at", null)
         .order("created_at");
@@ -583,18 +741,40 @@ async function handle(body: Record<string, unknown>) {
           option: r.option,
           note: r.note,
           paid: r.paid,
+          promoted_at: r.promoted_at,
         })),
       };
     }
 
+    // 移除接龍。移除的是正取而且有人在候補 → 候補第 1 位遞補：通知本人付款、通知管理員對帳
     case "admin_remove_signup": {
       requireAdmin(member);
-      const { error } = await db
-        .from("signups")
+      const signupId = String(body.signupId ?? "");
+      const { data: su } = await db.from("signups").select("activity_id").eq("id", signupId).is("cancelled_at", null).maybeSingle();
+      if (!su) return { ok: true };
+      const before = await activeSignups(su.activity_id);
+      const { error } = await db.from("signups")
         .update({ cancelled_at: new Date().toISOString() })
-        .eq("id", String(body.signupId ?? ""))
+        .eq("id", signupId)
         .is("cancelled_at", null);
       if (error) throw error;
+      const { data: a } = await db.from("activities").select(`${NOTIFY_FIELDS}, reached_notified_at`).eq("id", su.activity_id).maybeSingle();
+      const idx = before.findIndex((s) => s.id === signupId);
+      if (a && a.status === "open" && idx >= 0 && idx < a.capacity && before.length > a.capacity) {
+        const removed = before[idx], promoted = before[a.capacity];
+        await db.from("signups").update({ promoted_at: new Date().toISOString() }).eq("id", promoted.id);
+        const reached = before.length - 1 >= a.threshold;
+        const who = `${promoted.members?.nickname ?? "?"}${promoted.members?.line_display_name ? `（LINE：${promoted.members.line_display_name}）` : ""}`;
+        await background(Promise.all([
+          pushLine([promoted.members?.line_user_id],
+            `🎉【候補遞補成功】${a.title}\n${fmtWhen(a)}\n有人取消，你從候補遞補為正取！\n` +
+              (reached ? `${payText(a)}\n\n活動頁：${evLink(a.id)}` : `成團後會再通知你付款。\n活動頁：${evLink(a.id)}`)),
+          staffLineIds(a).then((ids) => pushLine(ids,
+            `🔁【候補遞補】${a.title}\n${fmtWhen(a)}\n${who} 從候補遞補為正取（補 ${removed.members?.nickname ?? "?"} 的位置）。\n` +
+              (reached ? "已通知本人付款，收到款項後請到名單勾「已付款」。" : "還沒成團，成團時會一起通知付款。") + `\n${evLink(a.id)}`)),
+        ]).catch((e) => console.error(e)));
+        return { ok: true, promoted: promoted.members?.nickname ?? null };
+      }
       return { ok: true };
     }
 
@@ -672,6 +852,11 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
+    // 每日排程：用 x-cron-secret 驗證（不經過 LINE 登入）
+    if (body?.action === "cron_daily") {
+      if (!CRON_SECRET || req.headers.get("x-cron-secret") !== CRON_SECRET) throw new ApiError(401, "bad_cron_secret");
+      return new Response(JSON.stringify(await runDaily()), { status: 200, headers });
+    }
     const result = await handle(body ?? {});
     return new Response(JSON.stringify(result), { status: 200, headers });
   } catch (e) {

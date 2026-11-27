@@ -113,6 +113,8 @@
 - [x] LINE 通知（2026-11-27，重新加回）：成團 → 正取團員（附預約付款連結）＋管理員（社員自揪再加揪團人）；自揪申請 → 管理員；審核結果 → 申請人。成團通知用 `reached_notified_at` 確保每場只發一次；部署時已成團的活動不補發
 - [x] 活動管理「下載 Excel」（SheetJS，按下才從 jsDelivr 載入）：活動總表＋接龍名單（2026-11-27）
 - [x] 手機版後台：寬表格只在框內左右滑，不再撐寬整頁
+- [x] LINE 通知第二輪（2026-11-28，定案表見 claude.ai Sheets「出走社 LINE 通知表」）：成團後接龍 → 本人付款通知；滿團 → 管理員；候補遞補 → 本人付款＋管理員對帳（名單標「遞補」、Excel 遞補時間）；流標（管理員按「流標」，活動保留顯示「已流標」）→ 所有接龍的人；刪除活動要填原因 → 所有接龍的人；已付款的人另外說明退款
+- [x] 每日排程（台灣 09:00）：活動前 7 天未成團提醒管理員「即將流標」（每場一次）、「今日待付款名單」給管理員（一天一次）。設定方式見 `supabase/cron/daily_notify.sql`
 - [ ] 實機測試：自揪申請／審核、圖片上傳（iPhone、Android、LINE 內建瀏覽器）、LINE 通知、下載 Excel
 - [ ] 研究藍星的規定（上面都做完後再討論）
 - [ ] 從 LINE 社群對話紀錄新增活動（提案中，見下方）
@@ -130,8 +132,11 @@
 | `upload_image` | 通過審核者 | `data`＝圖片 data URL（2MB 內、檔頭須為 JPEG/PNG/WebP）。回傳 `path`，存活動時放進 `images` |
 | `propose_activity` | 通過審核者 | 送出自揪申請（`activity`）；帶 `id`＝修改自己待審核／已退回的申請（退回的會重新送審）。新申請與退回後重送會通知管理員。錯誤：`too_many_pending`、`date_passed` |
 | `withdraw_proposal` | 通過審核者 | 撤回（刪除）自己待審核／已退回的申請 |
-| `admin_save_activity` / `admin_delete_activity` | 管理員 | 新增、編輯、刪除活動；新增時可帶 `dates` 陣列，同一份內容一次建立多場 |
+| `admin_save_activity` | 管理員 | 新增、編輯活動；新增時可帶 `dates` 陣列，同一份內容一次建立多場 |
 | `admin_review_activity` | 管理員 | `decision`＝`approve` / `reject`、`note`＝退回原因。只處理 `pending` 的申請（否則 `409 not_pending`），結果用 LINE 通知申請人 |
+| `admin_delete_activity` | 管理員 | 刪除活動。還沒舉行、有人接龍時要帶 `reason`（否則 `400 reason_required`），並用 LINE 通知所有接龍的人 |
+| `admin_cancel_activity` | 管理員 | 流標：`status` 改 `cancelled`（社員看得到「已流標」），`reason` 選填；通知所有接龍的人 |
+| `cron_daily` | 每日排程 | 不經 LINE 登入，header `x-cron-secret` 要等於 Edge Function Secret `CRON_SECRET`。即將流標提醒＋今日待付款名單 |
 | `admin_export` | 管理員 | `activityIds` 陣列 → 這些活動的完整接龍名單（下載 Excel 用） |
 | `admin_roster` / `admin_remove_signup` / `admin_set_paid` | 管理員 | 看名單（含 LINE 名稱、方案、備註、已付款）、移除接龍、勾選已付款 |
 | `admin_save_about` | 管理員 | 儲存「關於出走社」內容（2 萬字內） |
@@ -145,7 +150,8 @@
 - **訊息則數有上限**：成團通知是「每位收件人算一則」。台灣官方帳號免費方案每月則數有限（以 LINE 官方帳號後台「方案」頁為準），超過就發不出去；社員多了以後可能要升級付費方案。
 - **user ID 只在同一個 Provider 內通用**：現在 LINE Login 和官方帳號都在測試 Provider `出走社測試`，所以發得到。正式上線若改用正式官方帳號，LINE Login＋LIFF 也要搬到同一個 Provider（見上方「正式上線時」）。
 - 沒設定 `LINE_MESSAGING_TOKEN` 時不發通知，其他功能照常。
-- 不會通知的情況：候補遞補成正取、管理員移除接龍、成團後又掉到門檻以下再補上（只發第一次）。
+- 不會通知的情況：一般接龍（未成團）、排進候補（網頁會顯示候補第幾位）、成團後又掉到門檻以下再補上（成團通知只發第一次）。
+- 社員自揪的活動：管理員收到的成團、滿團、候補遞補、即將流標，揪團人也會收到。
 
 ## 活動圖片的限制
 
