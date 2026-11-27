@@ -1643,7 +1643,7 @@ boot();
     const { mine, all } = DemoBackend.notices();
     const list = tab === 'mine' ? mine : all;
     const body = list.length ? list.map(n=>`<div class="ln-msg"><div class="ln-av">出</div><div>
-        <div class="ln-meta">出走社官方帳號 → <b>${esc(n.toName)}</b>${n.mine ? '（你）' : ''}・${fmtTime(n.at)}${n.mine && Date.parse(n.at) > seen ? '<span class="ln-new">新</span>' : ''}</div>
+        <div class="ln-meta">出走社官方帳號 → <b>${esc(n.toName)}</b>${n.mine ? '（你）' : ''}・${n.cron ? `${fmtTime(n.at).split(' ')[0]} 09:00` : fmtTime(n.at)}${n.mine && Date.parse(n.at) > seen ? '<span class="ln-new">新</span>' : ''}</div>
         <div class="ln-bubble">${msgHtml(n.text, n.mine)}</div></div></div>`).join('')
       : `<div class="ln-empty">${tab === 'mine' ? '你還沒有收到通知' : '還沒有任何人收到通知'}</div>`;
     return `<div class="sheet-head ln-head"><h2>📩 LINE 通知（模擬）</h2><button class="close" data-close aria-label="關閉">×</button>
