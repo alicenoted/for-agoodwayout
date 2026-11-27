@@ -267,7 +267,7 @@ type NotifyAct = {
 function payText(a: NotifyAct) {
   const price = a.price ? `$${Number(a.price).toLocaleString("en-US")}${a.price_note ? `（${a.price_note}）` : ""}` : "免費";
   const how = a.booking_url
-    ? `請在活動前 7 天完成預約付款（以付款順序為準）：\n${a.booking_url}`
+    ? `請在活動前 7 天完成預約付款：\n${a.booking_url}`
     : a.category === "member"
     ? "付款方式請留意揪團人在 LINE 社群的說明。"
     : "管理員會在 LINE 社群公告付款方式，請留意訊息。";
