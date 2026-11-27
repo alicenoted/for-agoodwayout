@@ -11,6 +11,18 @@ import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 // LINE Login channel ID（公開值；LIFF ID 的前半段）
 const LINE_CHANNEL_ID = Deno.env.get("LINE_CHANNEL_ID") ?? "2012620335";
 
+// 官方帳號（Messaging API）的金鑰：存在 Supabase Edge Function Secrets，不放在程式碼裡。
+// 沒設定時不發 LINE 通知，其他功能照常。
+const LINE_MESSAGING_TOKEN = Deno.env.get("LINE_MESSAGING_TOKEN") ?? "";
+const LIFF_URL = Deno.env.get("LIFF_URL") ?? "https://liff.line.me/2012620335-Hk2HkkYY";
+
+// 活動圖片（Supabase Storage，公開 bucket）
+const BUCKET = "activity-images";
+const MAX_IMAGES = 3;
+const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
+const IMG_PATH = /^act\/[0-9a-f-]{36}\.(jpg|png|webp)$/;
+const MAX_PENDING_PROPOSALS = 5;   // 每人同時最多幾個「待審核」的自揪申請
+
 // 允許呼叫這個 API 的網站
 const ALLOWED_ORIGINS = [
   "https://alicenoted.github.io",
@@ -119,6 +131,15 @@ function cleanOptions(v: unknown): string | null {
 }
 const optionList = (s: string | null) => (s ? s.split("\n") : []);
 
+// 圖片：只接受這個 API 上傳時產生的路徑，最多 3 張
+function cleanImages(v: unknown): string[] {
+  if (v === undefined || v === null) return [];
+  if (!Array.isArray(v)) throw new ApiError(400, "bad_images");
+  const list = [...new Set(v.map(String))];
+  if (list.length > MAX_IMAGES || list.some((p) => !IMG_PATH.test(p))) throw new ApiError(400, "bad_images");
+  return list;
+}
+
 // 只接受活動表單裡允許的欄位，並檢查內容
 function cleanActivity(a: Record<string, unknown>) {
   const str = (v: unknown, max = 200) => (typeof v === "string" ? v.trim().slice(0, max) : "");
@@ -138,6 +159,7 @@ function cleanActivity(a: Record<string, unknown>) {
     booking_url: str(a.booking_url, 500) || null,
     options: cleanOptions(a.options),
     wait_max: int(a.wait_max ?? 0),
+    images: cleanImages(a.images),
   };
   if (out.booking_url && !/^https?:\/\//.test(out.booking_url)) throw new ApiError(400, "bad_booking_url");
   if (!(out.wait_max >= 0 && out.wait_max <= 20)) throw new ApiError(400, "bad_wait_max");
@@ -160,6 +182,136 @@ async function mySignupIds(memberId: string): Promise<string[]> {
   return data.map((r) => r.activity_id);
 }
 
+const ACT_FIELDS =
+  "id, category, title, host_name, event_date, time_text, place, price, price_note, capacity, threshold, description, booking_url, options, wait_max, images, status, created_by, review_note, reviewed_at, created_at";
+
+// 圖片沒有任何活動在用了才真的刪掉（「複製活動」會共用同一張圖）
+async function cleanupImages(paths: string[]) {
+  const gone: string[] = [];
+  for (const p of new Set(paths)) {
+    const { data } = await db.from("activities").select("id").contains("images", [p]).limit(1);
+    if (!data?.length) gone.push(p);
+  }
+  if (gone.length) {
+    const { error } = await db.storage.from(BUCKET).remove(gone);
+    if (error) console.error("image cleanup failed", error);
+  }
+}
+
+// 檢查上傳檔案的內容真的是圖片（看檔頭，不信任瀏覽器給的類型）
+function imageExt(bytes: Uint8Array): "jpg" | "png" | "webp" | null {
+  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "jpg";
+  if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) return "png";
+  const ascii = (a: number, b: number) => String.fromCharCode(...bytes.slice(a, b));
+  if (ascii(0, 4) === "RIFF" && ascii(8, 12) === "WEBP") return "webp";
+  return null;
+}
+const MIME = { jpg: "image/jpeg", png: "image/png", webp: "image/webp" };
+
+/* ---------- LINE 通知（官方帳號） ---------- */
+// 只有「加了官方帳號好友」的人收得到；通知失敗不影響主要動作，只記錄在 log。
+async function pushLine(to: (string | null | undefined)[], text: string) {
+  const ids = [...new Set(to.filter((x): x is string => !!x))];
+  if (!LINE_MESSAGING_TOKEN || !ids.length) return;
+  for (let i = 0; i < ids.length; i += 500) {   // multicast 一次最多 500 人
+    try {
+      const res = await fetch("https://api.line.me/v2/bot/message/multicast", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${LINE_MESSAGING_TOKEN}` },
+        body: JSON.stringify({ to: ids.slice(i, i + 500), messages: [{ type: "text", text: text.slice(0, 4900) }] }),
+      });
+      if (!res.ok) console.error("LINE multicast failed", res.status, await res.text());
+    } catch (e) {
+      console.error("LINE multicast error", e);
+    }
+  }
+}
+
+// 通知在背景送出，不讓使用者等 LINE 回應
+function background(p: Promise<unknown>) {
+  const rt = (globalThis as any).EdgeRuntime;
+  if (rt?.waitUntil) rt.waitUntil(p);
+  else return p;
+}
+
+async function adminLineIds(): Promise<string[]> {
+  const { data } = await db.from("members").select("line_user_id").eq("is_admin", true).eq("status", "approved");
+  return (data ?? []).map((m) => m.line_user_id);
+}
+async function lineIdOf(memberId: string | null): Promise<string | null> {
+  if (!memberId) return null;
+  const { data } = await db.from("members").select("line_user_id").eq("id", memberId).maybeSingle();
+  return data?.line_user_id ?? null;
+}
+
+function fmtWhen(a: { event_date: string; time_text: string | null }) {
+  const d = new Date(a.event_date + "T00:00:00Z");
+  const week = "日一二三四五六"[d.getUTCDay()];
+  return `${d.getUTCMonth() + 1}/${d.getUTCDate()}（${week}）${a.time_text ? " " + a.time_text : ""}`;
+}
+const evLink = (id: string) => `${LIFF_URL}?ev=${id}`;
+
+// 人數達到開班門檻時發「成團通知」：正取的團員（請匯款）＋管理員（＋社員自揪的揪團人）。
+// 用 reached_notified_at 鎖住，同一場只會發一次（兩人同時接龍、之後有人取消再補上都不會重發）。
+async function maybeNotifyReached(activityId: string) {
+  if (!LINE_MESSAGING_TOKEN) return;
+  try {
+    const { data: pre } = await db.from("activities")
+      .select("threshold, status, reached_notified_at").eq("id", activityId).maybeSingle();
+    if (!pre || pre.status !== "open" || pre.reached_notified_at) return;
+    const { count } = await db.from("signups")
+      .select("id", { count: "exact", head: true }).eq("activity_id", activityId).is("cancelled_at", null);
+    if ((count ?? 0) < pre.threshold) return;
+
+    const { data: a } = await db.from("activities")
+      .update({ reached_notified_at: new Date().toISOString() })
+      .eq("id", activityId).is("reached_notified_at", null)
+      .select("id, title, event_date, time_text, capacity, threshold, price, price_note, booking_url, category, created_by")
+      .maybeSingle();
+    if (!a) return;   // 別的請求已經發過了
+
+    const { data: main } = await db.from("signups")
+      .select("members(line_user_id)")
+      .eq("activity_id", activityId).is("cancelled_at", null)
+      .order("created_at").limit(a.capacity);
+    const price = a.price ? `$${Number(a.price).toLocaleString("en-US")}${a.price_note ? `（${a.price_note}）` : ""}` : "免費";
+    const pay = a.booking_url
+      ? `請在活動前 7 天完成預約付款（以付款順序為準）：\n${a.booking_url}`
+      : a.category === "member"
+      ? "付款方式請留意揪團人在 LINE 社群的說明。"
+      : "管理員會在 LINE 社群公告付款方式，請留意訊息。";
+    await pushLine(
+      (main ?? []).map((s: any) => s.members?.line_user_id),
+      `🎉【成團通知】${a.title}\n${fmtWhen(a)}\n已達 ${a.threshold} 人開班門檻，活動確定舉行！\n費用：${price}\n${pay}\n\n活動頁：${evLink(a.id)}`,
+    );
+    const staff = await adminLineIds();
+    if (a.category === "member") staff.push((await lineIdOf(a.created_by)) ?? "");
+    await pushLine(
+      staff,
+      `✅【成團】${a.title}\n${fmtWhen(a)}・目前 ${count}／${a.capacity} 人（門檻 ${a.threshold} 人）\n` +
+        (a.booking_url ? "團員已收到預約付款通知。" : "這場沒有預約付款連結，請到 LINE 社群公告付款方式。") +
+        `\n${evLink(a.id)}`,
+    );
+  } catch (e) {
+    console.error("maybeNotifyReached error", e);
+  }
+}
+
+// 只回傳給前端需要的欄位；review_note 只給管理員和申請人本人
+function activityOut(a: any, viewer: Member) {
+  const own = a.created_by === viewer.id;
+  return {
+    id: a.id, category: a.category, title: a.title, host_name: a.host_name, event_date: a.event_date,
+    time_text: a.time_text, place: a.place, price: a.price, price_note: a.price_note, capacity: a.capacity,
+    threshold: a.threshold, description: a.description, booking_url: a.booking_url, options: a.options,
+    wait_max: a.wait_max, images: a.images ?? [], status: a.status, mine_created: own,
+    ...(viewer.is_admin || own
+      ? { review_note: a.review_note, reviewed_at: a.reviewed_at, created_at: a.created_at }
+      : {}),
+    ...(viewer.is_admin ? { proposer: a.creator?.nickname ?? null, proposer_line: a.creator?.line_display_name ?? null } : {}),
+  };
+}
+
 async function handle(body: Record<string, unknown>) {
   const line = await verifyLine(body.idToken);
   let member = await findMember(line.userId);
@@ -180,17 +332,26 @@ async function handle(body: Record<string, unknown>) {
 
     // 活動與名單（只有通過審核的成員拿得到；名單只含暱稱）
     case "data": {
-      requireApproved(member);
+      const m = requireApproved(member);
       const since = new Date(Date.now() - 180 * 86400_000).toISOString().slice(0, 10);
+      // 管理員也拿得到「待審核／已退回」的社員自揪申請
+      const statuses = m.is_admin ? ["open", "pending", "rejected"] : ["open"];
       const activities = await fetchAll<any>(() =>
         db.from("activities")
-          .select("id, category, title, host_name, event_date, time_text, place, price, price_note, capacity, threshold, description, booking_url, options, wait_max")
-          .eq("status", "open")
+          .select(`${ACT_FIELDS}, creator:members!activities_created_by_fkey(nickname, line_display_name)`)
+          .in("status", statuses)
           .gte("event_date", since)
           .order("event_date")
           .order("created_at")
       );
-      const ids = activities.map((a) => a.id);
+      // 我自己送出、還沒上架的自揪申請
+      const { data: mine, error: mineErr } = await db.from("activities")
+        .select(ACT_FIELDS)
+        .eq("created_by", m.id)
+        .in("status", ["pending", "rejected"])
+        .order("created_at", { ascending: false });
+      if (mineErr) throw mineErr;
+      const ids = activities.filter((a) => a.status === "open").map((a) => a.id);
       const signups = ids.length
         ? await fetchAll<any>(() =>
           db.from("signups")
@@ -201,7 +362,8 @@ async function handle(body: Record<string, unknown>) {
         )
         : [];
       return {
-        activities,
+        activities: activities.map((a) => activityOut(a, m)),
+        myProposals: m.is_admin ? [] : mine.map((a) => activityOut(a, m)),
         signups: signups.map((s) => ({ activity_id: s.activity_id, nickname: s.members?.nickname, option: s.option })),
       };
     }
@@ -237,6 +399,7 @@ async function handle(body: Record<string, unknown>) {
         p_note: note,
       });
       if (error) throw error;
+      if (data === "ok" || data === "reached") await background(maybeNotifyReached(activityId));
       return { result: data }; // ok / reached / waitlist / full / already_joined / not_found
     }
 
@@ -247,14 +410,140 @@ async function handle(body: Record<string, unknown>) {
       return { body: data?.body ?? "", updated_at: data?.updated_at ?? null };
     }
 
+    // 上傳一張活動圖片（前端已先縮圖成 JPEG）。回傳路徑，存活動時再帶進 images。
+    case "upload_image": {
+      requireApproved(member);
+      const b64 = typeof body.data === "string" ? body.data.replace(/^data:[^,]*,/, "") : "";
+      if (!b64 || b64.length > Math.ceil(MAX_IMAGE_BYTES / 3) * 4 + 8) throw new ApiError(400, "image_too_large");
+      let bytes: Uint8Array;
+      try {
+        bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+      } catch {
+        throw new ApiError(400, "bad_image");
+      }
+      if (bytes.length > MAX_IMAGE_BYTES) throw new ApiError(400, "image_too_large");
+      const ext = imageExt(bytes);
+      if (!ext) throw new ApiError(400, "bad_image");
+      const path = `act/${crypto.randomUUID()}.${ext}`;
+      const { error } = await db.storage.from(BUCKET)
+        .upload(path, bytes, { contentType: MIME[ext], cacheControl: "31536000", upsert: false });
+      if (error) throw error;
+      return { path };
+    }
+
+    // ---------- 社員自揪：送出申請 → 管理員審核 → 上架 ----------
+    case "propose_activity": {
+      const m = requireApproved(member);
+      const a = cleanActivity({ ...(body.activity ?? {}) as Record<string, unknown>, category: "member" });
+      a.booking_url = null;   // 預約付款連結只有管理員能設定
+      const today = new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 10);   // 台灣日期
+      if (a.event_date < today) throw new ApiError(400, "date_passed");
+      const id = typeof body.id === "string" && body.id ? body.id : null;
+      let notify = true;
+      if (id) {
+        // 修改自己「待審核／已退回」的申請；已退回的改完會重新送審
+        const { data: old } = await db.from("activities").select("status, created_by, images").eq("id", id).maybeSingle();
+        if (!old || old.created_by !== m.id || !["pending", "rejected"].includes(old.status)) throw new ApiError(404, "not_found");
+        notify = old.status === "rejected";
+        const { error } = await db.from("activities")
+          .update({ ...a, status: "pending", review_note: null, reviewed_at: null, reviewed_by: null })
+          .eq("id", id);
+        if (error) throw error;
+        await cleanupImages((old.images ?? []).filter((p: string) => !a.images.includes(p)));
+      } else {
+        const { count } = await db.from("activities")
+          .select("id", { count: "exact", head: true }).eq("created_by", m.id).eq("status", "pending");
+        if ((count ?? 0) >= MAX_PENDING_PROPOSALS) throw new ApiError(400, "too_many_pending");
+        const { error } = await db.from("activities").insert({ ...a, status: "pending", created_by: m.id });
+        if (error) throw error;
+      }
+      if (notify) {
+        await background(adminLineIds().then((ids) =>
+          pushLine(ids, `🙋【自揪申請待審核】${a.title}\n${fmtWhen(a)}\n申請人：${m.nickname}\n請到後台「活動管理 → 待審核」審核\n${LIFF_URL}?page=review`)
+        ));
+      }
+      return { ok: true };
+    }
+
+    case "withdraw_proposal": {
+      const m = requireApproved(member);
+      const id = String(body.id ?? "");
+      const { data: old } = await db.from("activities").select("status, created_by, images").eq("id", id).maybeSingle();
+      if (!old || old.created_by !== m.id || !["pending", "rejected"].includes(old.status)) throw new ApiError(404, "not_found");
+      const { error } = await db.from("activities").delete().eq("id", id);
+      if (error) throw error;
+      await cleanupImages(old.images ?? []);
+      return { ok: true };
+    }
+
     // ---------- 管理員 ----------
+    case "admin_review_activity": {
+      const me = requireAdmin(member);
+      const id = String(body.id ?? "");
+      const approve = body.decision === "approve";
+      if (!approve && body.decision !== "reject") throw new ApiError(400, "bad_decision");
+      const note = typeof body.note === "string" ? body.note.trim().slice(0, 300) || null : null;
+      const { data: a, error } = await db.from("activities")
+        .update({
+          status: approve ? "open" : "rejected",
+          review_note: approve ? null : note,
+          reviewed_at: new Date().toISOString(),
+          reviewed_by: me.id,
+        })
+        .eq("id", id).eq("status", "pending")
+        .select("id, title, event_date, time_text, created_by")
+        .maybeSingle();
+      if (error) throw error;
+      if (!a) throw new ApiError(409, "not_pending");   // 已經被別的管理員審過了
+      const to = [await lineIdOf(a.created_by)];
+      await background(pushLine(
+        to,
+        approve
+          ? `🎉【自揪審核通過】${a.title}\n${fmtWhen(a)}\n已經上架，大家可以開始接龍囉！\n${evLink(a.id)}`
+          : `↩️【自揪申請退回】${a.title}\n${fmtWhen(a)}\n${note ? `原因：${note}\n` : ""}可以到網站「我的自揪」修改後重新送出。\n${LIFF_URL}?page=proposals`,
+      ));
+      return { ok: true };
+    }
+
+    // 下載 Excel 用：一次拿多場活動的完整名單（含 LINE 名稱、備註、付款）
+    case "admin_export": {
+      requireAdmin(member);
+      const ids = Array.isArray(body.activityIds) ? [...new Set(body.activityIds.map(String))].slice(0, 1000) : [];
+      const rows: any[] = [];
+      for (let i = 0; i < ids.length; i += 100) {
+        rows.push(...await fetchAll<any>(() =>
+          db.from("signups")
+            .select("activity_id, created_at, option, note, paid, members(nickname, line_display_name)")
+            .in("activity_id", ids.slice(i, i + 100))
+            .is("cancelled_at", null)
+            .order("created_at")
+            .order("id")
+        ));
+      }
+      return {
+        signups: rows.map((r) => ({
+          activity_id: r.activity_id,
+          created_at: r.created_at,
+          nickname: r.members?.nickname,
+          line_name: r.members?.line_display_name,
+          option: r.option,
+          note: r.note,
+          paid: r.paid,
+        })),
+      };
+    }
+
     case "admin_save_activity": {
       const m = requireAdmin(member);
       const a = cleanActivity((body.activity ?? {}) as Record<string, unknown>);
       const id = typeof body.id === "string" && body.id ? body.id : null;
       if (id) {
+        const { data: old } = await db.from("activities").select("images").eq("id", id).maybeSingle();
+        if (!old) throw new ApiError(404, "not_found");
         const { error } = await db.from("activities").update(a).eq("id", id);
         if (error) throw error;
+        await cleanupImages((old.images ?? []).filter((p: string) => !a.images.includes(p)));
+        await background(maybeNotifyReached(id));   // 例如把門檻調低後剛好成團
         return { ok: true, created: 0 };
       }
       // 新增時可以一次給多個日期（同一份內容，每個日期一場）
@@ -268,8 +557,11 @@ async function handle(body: Record<string, unknown>) {
 
     case "admin_delete_activity": {
       requireAdmin(member);
-      const { error } = await db.from("activities").delete().eq("id", String(body.id ?? ""));
+      const id = String(body.id ?? "");
+      const { data: old } = await db.from("activities").select("images").eq("id", id).maybeSingle();
+      const { error } = await db.from("activities").delete().eq("id", id);
       if (error) throw error;
+      await cleanupImages(old?.images ?? []);
       return { ok: true };
     }
 
