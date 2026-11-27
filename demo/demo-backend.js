@@ -367,11 +367,12 @@
         const a = db.activities.find((x) => x.id === body.id && x.status === 'pending');
         if (!a) throw new ApiError(409, 'not_pending');
         const note = typeof body.note === 'string' ? body.note.trim().slice(0, 300) || null : null;
+        if (!approve && !note) throw new ApiError(400, 'note_required');
         a.status = approve ? 'open' : 'rejected';
-        a.review_note = approve ? null : note;
+        a.review_note = note;   // 更改建議：退回、通過都保留
         pushLine(db, [a.created_by], approve
-          ? `🎉【自揪審核通過】${a.title}\n${when(a)}\n已經上架，大家可以開始接龍囉！\n${evLink(a.id)}`
-          : `↩️【自揪申請退回】${a.title}\n${when(a)}\n${note ? `原因：${note}\n` : ''}可以到網站「我的自揪」修改後重新送出。\n${LIFF_URL}?page=proposals`);
+          ? `🎉【自揪審核通過】${a.title}\n${when(a)}\n已經上架，大家可以開始接龍囉！${note ? `\n\n管理員的更改建議：${note}` : ''}\n${evLink(a.id)}`
+          : `↩️【自揪申請退回】${a.title}\n${when(a)}\n${note ? `更改建議：${note}\n` : ''}請到網站「我的自揪」照建議修改後重新送出。\n${LIFF_URL}?page=proposals`);
         changed = true;
         result = { ok: true };
         break;
