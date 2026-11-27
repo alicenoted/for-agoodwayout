@@ -606,8 +606,9 @@ function info(ev){
   const reached = n >= ev.threshold, ended = ev.date < todayKey;
   let status, cls;
   if(ended){ status='已結束'; cls='closed'; }
-  else if(total >= ev.capacity + wm){ status='額滿'; cls='closed'; }
-  else if(total >= ev.capacity){ status=`額滿・可候補 ${ev.capacity + wm - total} 位`; cls='full'; }
+  // 順序：接龍中 → 已成團（到開班門檻）→ 滿團（到名額上限，之後才能排候補）→ 候補也滿
+  else if(total >= ev.capacity + wm){ status = wm ? '滿團・候補已滿' : '滿團'; cls='closed'; }
+  else if(total >= ev.capacity){ status=`滿團・可候補 ${ev.capacity + wm - total} 位`; cls='full'; }
   else if(reached){ status=`已成團・剩 ${ev.capacity-n} 位`; cls='go'; }
   else { status=`接龍中・差 ${ev.threshold-n} 人成團`; cls='open'; }
   return { n, total, waitN, reached, ended, status, cls, left:Math.max(0, ev.capacity-n),
@@ -858,9 +859,9 @@ function openDetail(id){
   let cta;
   if(mine) cta = waiting ? `<div class="left"><b>⏳ 候補中</b>・${esc(myNick)}<br>需要取消請私訊管理員</div>`
                          : `<div class="left"><b>✓ 已接龍</b>・${esc(myNick)}<br>需要取消請私訊管理員</div>${i.reached && ev.booking ? `<a class="btn" href="${esc(ev.booking)}" target="_blank" rel="noopener">預約付款 ↗</a>` : ''}`;
-  else if(i.canJoin) cta = `<div class="left"><b>${money(ev.price)}</b> ${esc(ev.priceNote)}<br>${i.isWait ? `正取已滿・候補剩 ${ev.capacity + ev.waitMax - i.total} 位` : `剩 ${i.left} 個名額`}</div><button class="btn" data-join="${ev.id}">${i.isWait ? '加入候補' : '+1 接龍'}</button>`;
+  else if(i.canJoin) cta = `<div class="left"><b>${money(ev.price)}</b> ${esc(ev.priceNote)}<br>${i.isWait ? `已滿團・候補剩 ${ev.capacity + ev.waitMax - i.total} 位` : `剩 ${i.left} 個名額`}</div><button class="btn" data-join="${ev.id}">${i.isWait ? '加入候補' : '+1 接龍'}</button>`;
   else if(i.ended) cta = `<div class="left"><b>活動已結束</b></div>`;
-  else cta = `<div class="left"><b>名額已滿</b><br>下次早點來 🙏</div><button class="btn" disabled>已額滿</button>`;
+  else cta = `<div class="left"><b>${ev.waitMax ? '已滿團，候補也滿了' : '已滿團'}</b><br>下次早點來 🙏</div><button class="btn" disabled>已滿團</button>`;
 
   openModal(`
     <div class="sheet-head">
@@ -904,7 +905,7 @@ async function join(id, btn){
     const ev = findEv(id);
     if(result==='ok' || result==='reached') toast(result==='reached' || (!before && ev && info(ev).reached) ? '🎉 你是成團的關鍵一票！' : '接龍成功！');
     else if(result==='waitlist') toast('已加入候補，有空位時會依序遞補');
-    else if(result==='full') toast('差一點！名額和候補都滿了');
+    else if(result==='full') toast(findEv(id)?.waitMax ? '差一點！已滿團，候補也滿了' : '差一點！已經滿團了');
     else if(result==='already_joined') toast('你已經在名單上了');
     else toast('這個活動已經不開放了');
     render(); openDetail(id);
