@@ -23,8 +23,14 @@ const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
 const IMG_PATH = /^act\/[0-9a-f-]{36}\.(jpg|png|webp)$/;
 const MAX_PENDING_PROPOSALS = 5;   // 每人同時最多幾個「待審核」的自揪申請
 
-// 每日排程（Supabase pg_cron 每天早上呼叫一次 action: "cron_daily"）用的密碼，存在 Edge Function Secrets
+// 每日排程（Supabase pg_cron 每天早上呼叫一次 action: "cron_daily"）用的密碼：
+// 資料庫自己產生、存在 app_secrets（只有後端讀得到）；有設 Edge Function Secret CRON_SECRET 時以它為準
 const CRON_SECRET = Deno.env.get("CRON_SECRET") ?? "";
+async function cronSecret(): Promise<string> {
+  if (CRON_SECRET) return CRON_SECRET;
+  const { data } = await db.from("app_secrets").select("value").eq("key", "cron").maybeSingle();
+  return data?.value ?? "";
+}
 const FLOP_WARN_DAYS = Number(Deno.env.get("FLOP_WARN_DAYS") ?? "7");   // 活動前幾天還沒成團就提醒管理員「即將流標」
 
 // 允許呼叫這個 API 的網站
@@ -857,7 +863,8 @@ Deno.serve(async (req) => {
     const body = await req.json();
     // 每日排程：用 x-cron-secret 驗證（不經過 LINE 登入）
     if (body?.action === "cron_daily") {
-      if (!CRON_SECRET || req.headers.get("x-cron-secret") !== CRON_SECRET) throw new ApiError(401, "bad_cron_secret");
+      const secret = await cronSecret();
+      if (!secret || req.headers.get("x-cron-secret") !== secret) throw new ApiError(401, "bad_cron_secret");
       return new Response(JSON.stringify(await runDaily()), { status: 200, headers });
     }
     const result = await handle(body ?? {});

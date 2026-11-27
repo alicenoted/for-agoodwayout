@@ -42,6 +42,8 @@
 | `activities` | 類別、名稱、日期、地點、費用、名額、開班門檻、候補人數 `wait_max`、預約付款連結 `booking_url`、方案選項 `options`（一行一個）、圖片 `images`（Storage 路徑，最多 3 個）、狀態 `status`（`open` 上架／`pending` 自揪待審核／`rejected` 退回／`cancelled`）、退回原因 `review_note`、成團通知時間 `reached_notified_at` | 否（通過審核的成員經由 API 讀取；待審核／退回只有管理員和申請人本人看得到） |
 | `signups` | 哪個社員、哪場活動、接龍時間、取消時間、選的方案 `option`、給管理員的備註 `note`、已付款 `paid` | 否（API 只回傳暱稱和方案） |
 | `site_content` | 網站文字內容（目前只有 `about`：關於出走社） | 否（通過審核的成員經由 API 讀取） |
+| `notify_log` | 每日提醒發過的日期（避免同一天重發） | 否 |
+| `app_secrets` | 每日排程用的隨機密碼（資料庫自己產生） | 否 |
 
 - 新成員預設 `pending`；管理員在後台「人員清單」通過後才看得到活動。
 - Storage bucket `activity-images`：公開讀取、單檔 2MB、只收 JPEG/PNG/WebP。上傳一律經過 API（`upload_image`，會檢查檔頭）；前端先縮成長邊 1600px 的 JPEG。刪除活動或移除圖片時，沒有其他活動在用（「複製」會共用圖片）才刪檔。
@@ -114,9 +116,10 @@
 - [x] 活動管理「下載 Excel」（SheetJS，按下才從 jsDelivr 載入）：活動總表＋接龍名單（2026-11-27）
 - [x] 手機版後台：寬表格只在框內左右滑，不再撐寬整頁
 - [x] LINE 通知第二輪（2026-11-28，定案表見 claude.ai Sheets「出走社 LINE 通知表」）：成團後接龍 → 本人付款通知；滿團 → 管理員；候補遞補 → 本人付款＋管理員對帳（名單標「遞補」、Excel 遞補時間）；流標（管理員按「流標」，活動保留顯示「已流標」）→ 所有接龍的人；刪除活動要填原因 → 所有接龍的人；已付款的人另外說明退款
-- [x] 每日排程（台灣 09:00）：給管理員一則「每日提醒」，合併「⚠️ 即將流標」（活動前 7 天未成團，每場只列一次）和「💰 待付款」（已成團、未舉行活動中未勾已付款的正取）；兩段都沒有就不發，一天最多一則。設定方式見 `supabase/cron/daily_notify.sql`
+- [x] 每日排程（台灣 09:00）：給管理員一則「每日提醒」，合併「⚠️ 即將流標」（活動前 7 天未成團，每場只列一次）和「💰 待付款」（已成團、未舉行活動中未勾已付款的正取）；兩段都沒有就不發，一天最多一則。排程設定在 migration `20261128010000_daily_cron.sql`（pg_cron 每天 UTC 01:00 用 pg_net 呼叫 api）
 - [x] 在 LINE 裡打開時改用外部瀏覽器（2026-11-28，整合表見 Sheets「連結與瀏覽器」分頁）：LINE 通知的預約付款連結加 `openExternalBrowser=1`；網站裡的預約付款按鈕／連結、「關於出走社」內文網址用 `liff.openWindow({ external: true })`（`<a data-ext>`）；下載 Excel 在 LINE 裡改為提示「用瀏覽器開啟後台」。活動頁、審核頁、後台、活動照片維持在 LINE 裡
 - [x] 人員清單匯出從 CSV 改成下載 Excel（和活動管理統一）
+- [x] **2026-11-28 部署到正式版**：套用 migration `proposals_images_notify`、`notify_matrix`、`daily_cron`；Edge Function `api` 版本 11；網頁合併到 `claude/dazzling-bell-q1quxi`（GitHub Pages）。部署後用 pg_net 打 API 確認錯誤密碼與未登入都正確被擋
 - [ ] 實機測試：自揪申請／審核、圖片上傳（iPhone、Android、LINE 內建瀏覽器）、LINE 通知、下載 Excel
 - [ ] 研究藍星的規定（上面都做完後再討論）
 - [ ] 從 LINE 社群對話紀錄新增活動（提案中，見下方）
@@ -138,7 +141,7 @@
 | `admin_review_activity` | 管理員 | `decision`＝`approve` / `reject`、`note`＝更改建議（退回時必填，否則 `400 note_required`；通過時選填，一起通知申請人）。管理員不直接改申請內容。只處理 `pending` 的申請（否則 `409 not_pending`），結果用 LINE 通知申請人 |
 | `admin_delete_activity` | 管理員 | 刪除活動。還沒舉行、有人接龍時要帶 `reason`（否則 `400 reason_required`），並用 LINE 通知所有接龍的人 |
 | `admin_cancel_activity` | 管理員 | 流標：`status` 改 `cancelled`（社員看得到「已流標」），`reason` 選填；通知所有接龍的人 |
-| `cron_daily` | 每日排程 | 不經 LINE 登入，header `x-cron-secret` 要等於 Edge Function Secret `CRON_SECRET`。發一則「每日提醒」（即將流標＋待付款） |
+| `cron_daily` | 每日排程 | 不經 LINE 登入，header `x-cron-secret` 要等於資料表 `app_secrets`（key `cron`，資料庫自己產生的隨機值，只有後端讀得到）；若設了 Edge Function Secret `CRON_SECRET` 則以它為準。發一則「每日提醒」（即將流標＋待付款） |
 | `admin_export` | 管理員 | `activityIds` 陣列 → 這些活動的完整接龍名單（下載 Excel 用） |
 | `admin_roster` / `admin_remove_signup` / `admin_set_paid` | 管理員 | 看名單（含 LINE 名稱、方案、備註、已付款）、移除接龍、勾選已付款 |
 | `admin_save_about` | 管理員 | 儲存「關於出走社」內容（2 萬字內） |
