@@ -72,7 +72,7 @@ LINE（LIFF 自動登入）
 
 ## 開發
 
-- 體驗模式（`demo/`）自 2026-11-25 起不再跟著正式網站更新；需要時可執行 `python3 tools/build_demo.py` 重新產生。
+- 體驗模式（`demo/`）平常不跟著正式網站更新；新功能要先給管理員看時，執行 `python3 tools/build_demo.py` 重新產生（2026-11-27 為了預覽自揪、圖片、LINE 通知、Excel 更新過一次）。
 - 網頁是單一 HTML 檔，不需要編譯；推上 `claude/dazzling-bell-q1quxi` 分支後，GitHub Pages 約 1～2 分鐘內更新。
 - 資料表變更：在 `supabase/migrations/` 新增 SQL 檔，再套用到 Supabase 專案。
 - 後端變更：修改 `supabase/functions/api/index.ts` 後重新部署 Edge Function `api`（`verify_jwt` 維持關閉，由函式自己驗證 LINE 身分）。

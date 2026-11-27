@@ -4,19 +4,22 @@
  * 讓 app/index.html 不用 LINE、不用 Supabase 也能完整操作：
  *  - 假的 LIFF：社員頁第一次打開會走一次模擬的 LINE 登入流程（點連結 → 授權 → 進網站）
  *  - 攔截對後端 API 的呼叫，改用存在瀏覽器 localStorage 的假資料回應
- *  - 規則和正式後端（supabase/functions/api）一樣：審核、名額、成團、管理員權限
- *  - 正式後端會傳 LINE 通知給管理員；體驗模式不傳通知（管理員看側邊欄的待審核數字即可）
+ *  - 規則和正式後端（supabase/functions/api）一樣：審核、名額、候補、成團、自揪審核、管理員權限
+ *  - 正式後端會用官方帳號傳 LINE 通知；體驗模式改成存進「模擬 LINE 通知」收件匣（頁面上方的 📩 按鈕）
+ *  - 圖片存在瀏覽器裡（localStorage），容量有限，大約十幾張
  *
  * 社員頁和管理員頁在同一個網站底下，共用同一份 localStorage，所以一邊操作另一邊會即時更新。
  * 每個頁面在載入本檔前要先設定 window.DEMO_ROLE = 'member' 或 'admin'。
  */
 (function () {
   const KEY = 'gwo-demo-db';
+  const IMG_PREFIX = 'gwo-demo-img:';
   const ROLE = window.DEMO_ROLE === 'admin' ? 'admin' : 'member';
   const PERSONAS = {
     member: { line: 'U-demo-member', lineName: '體驗用 LINE 帳號' },
     admin:  { line: 'U-demo-admin',  lineName: '管理員（你）' },
   };
+  const LIFF_URL = 'https://liff.line.me/2012620335-Hk2HkkYY';
 
   // ---------- 假資料 ----------
   const pad = (n) => String(n).padStart(2, '0');
@@ -24,6 +27,24 @@
   const iso = (minsAgo) => new Date(Date.now() - minsAgo * 60000).toISOString();
   let seq = 0;
   const uid = (p) => `${p}-${Date.now().toString(36)}-${(seq++).toString(36)}`;
+
+  // 示範圖片：用 SVG 畫的漸層＋字，不佔空間
+  const SEED_IMAGES = {
+    'seed:aroma':  ['#7a5c3e', '#e8c99b', '🌿', '調香'],
+    'seed:aroma2': ['#4f6b52', '#d9e4c8', '🧴', '擴香石'],
+    'seed:hike':   ['#2f6f7e', '#f0c27b', '⛰️', '陽明山'],
+    'seed:hike2':  ['#3f7fb0', '#bfe0d9', '🥾', '健行'],
+    'seed:knit':   ['#b4577e', '#f6d6c8', '🧶', '編織'],
+  };
+  function seedSvg(path) {
+    const [a, b, emoji, word] = SEED_IMAGES[path] || ['#607789', '#dfe7ea', '🖼', '圖片'];
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600">
+      <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient></defs>
+      <rect width="800" height="600" fill="url(#g)"/><text x="400" y="290" font-size="150" text-anchor="middle">${emoji}</text>
+      <text x="400" y="420" font-size="64" fill="#fff" text-anchor="middle" font-family="sans-serif" font-weight="700">${word}</text>
+      <text x="400" y="560" font-size="26" fill="rgba(255,255,255,.8)" text-anchor="middle" font-family="sans-serif">示範圖片</text></svg>`;
+    return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  }
 
   function seed() {
     const members = [
@@ -33,42 +54,134 @@
       { id: 'm-3', line: 'U-3', line_name: 'Yuki',       nickname: 'Yuki', is_admin: false, status: 'approved', created_at: iso(60 * 24 * 12) },
       { id: 'm-4', line: 'U-4', line_name: '阿哲',       nickname: '阿哲', is_admin: false, status: 'approved', created_at: iso(60 * 24 * 6) },
     ];
-    const A = (id, category, title, host_name, d, time_text, place, price, price_note, capacity, threshold, description) =>
-      ({ id, category, title, host_name, event_date: dayAfter(d), time_text, place, price, price_note, capacity, threshold, description, status: 'open', created_at: iso(60 * 24 * 10) });
+    const A = (id, category, title, host_name, d, time_text, place, price, price_note, capacity, threshold, description, more = {}) =>
+      ({ id, category, title, host_name, event_date: dayAfter(d), time_text, place, price, price_note, capacity, threshold, description,
+         booking_url: null, options: null, wait_max: 0, images: [], status: 'open', created_by: 'm-admin', review_note: null,
+         reached_notified_at: null, created_at: iso(60 * 24 * 10), ...more });
     const activities = [
-      A('a-1', 'host',   '秋冬香氛調香課｜木質調擴香石', '香氛老師 Yen', 3,  '14:00–16:30', '出走社社辦', 1500, '含材料', 8, 4, '用雪松、檀香與一點橙花，調出屬於自己的秋冬氣味。\n每人完成一顆擴香石＋10ml 精油瓶。'),
-      A('a-2', 'member', '週五電影夜',                   '社員 阿哲 揪', 5,  '19:30',       '信義區影城', 0,    '票價自付', 6, 3, '看完找間咖啡廳聊聊心得，想來就 +1。'),
+      A('a-1', 'host',   '秋冬香氛調香課｜木質調擴香石', '香氛老師 Yen', 3,  '14:00–16:30', '出走社社辦', 1500, '含材料', 8, 4,
+        '用雪松、檀香與一點橙花，調出屬於自己的秋冬氣味。\n每人完成一顆擴香石＋10ml 精油瓶。',
+        { images: ['seed:aroma', 'seed:aroma2'], booking_url: 'https://agoodwayout.simplybook.asia/' }),
+      A('a-2', 'member', '週五電影夜',                   '阿哲', 5,  '19:30',       '信義區影城', 0,    '票價自付', 6, 3, '看完找間咖啡廳聊聊心得，想來就 +1。', { created_by: 'm-4' }),
       A('a-3', 'select', '旅行寫作講座：把出走寫成故事', '合作講者 林小路', 8, '14:00–16:00', '合作場地・中山區', 1200, '含一杯飲品', 20, 10, '講者分享十年旅行寫作經驗。'),
-      A('a-4', 'host',   '編織課｜冬日圍巾起針班',       '編織老師 Rita', 10, '14:00–17:00', '出走社社辦', 1800, '含毛線、棒針', 8, 4, '從起針到收針，三小時織出圍巾的第一段。'),
+      A('a-4', 'host',   '編織課｜冬日圍巾起針班',       '編織老師 Rita', 10, '14:00–17:00', '出走社社辦', 1800, '含毛線、棒針', 4, 2,
+        '從起針到收針，三小時織出圍巾的第一段。',
+        { images: ['seed:knit'], wait_max: 2, options: '單堂體驗（$1,800）\n三堂套組（$1,600／堂）', booking_url: 'https://agoodwayout.simplybook.asia/' }),
       A('a-5', 'social', '月底聚餐｜麻辣鍋之夜',         '出走社',       14, '18:30',       '東區・麻辣鍋', 680, '含服務費 $50', 12, 6, '月底一起吃鍋聊天！新朋友非常歡迎。'),
       A('a-6', 'select', '植物染手帕工作坊',             '合作工作室 染日', 17, '13:30–16:30', '合作工作室・大稻埕', 1600, '含材料', 12, 6, '用洋蔥皮與薯榔染出暖色系手帕。'),
+      // 一筆等待管理員審核的社員自揪
+      A('a-7', 'member', '週日陽明山健行（擎天崗大草原）', '小美', 12, '09:00–14:00', '捷運劍潭站 2 號出口集合', 0, 'AA 制，公車自付', 8, 3,
+        '輕鬆路線約 3 小時，適合第一次爬山的人。\n請穿好走的鞋、帶水和午餐。下雨就改期。',
+        { status: 'pending', created_by: 'm-1', images: ['seed:hike', 'seed:hike2'], created_at: iso(90) }),
     ];
-    const S = (activity_id, member_id, minsAgo) => ({ id: uid('s'), activity_id, member_id, created_at: iso(minsAgo), cancelled_at: null });
+    const S = (activity_id, member_id, minsAgo, extra = {}) => ({ id: uid('s'), activity_id, member_id, created_at: iso(minsAgo), cancelled_at: null, option: null, note: null, paid: false, ...extra });
     const signups = [
-      S('a-1', 'm-1', 3000), S('a-1', 'm-2', 2500), S('a-1', 'm-3', 2000),   // 差 1 人成團：適合體驗「關鍵一票」
-      S('a-2', 'm-4', 1500), S('a-2', 'm-1', 1200),                         // 差 1 人成團
+      S('a-1', 'm-1', 3000), S('a-1', 'm-2', 2500, { note: '可能會晚 10 分鐘' }), S('a-1', 'm-3', 2000),   // 差 1 人成團：適合體驗「關鍵一票」＋成團通知
+      S('a-2', 'm-4', 1500), S('a-2', 'm-1', 1200),                                                     // 差 1 人成團
       S('a-3', 'm-2', 900),  S('a-3', 'm-3', 800),
+      S('a-4', 'm-1', 1000, { option: '單堂體驗（$1,800）', paid: true }), S('a-4', 'm-2', 950, { option: '三堂套組（$1,600／堂）' }),
+      S('a-4', 'm-3', 900, { option: '單堂體驗（$1,800）' }), S('a-4', 'm-4', 850, { option: '單堂體驗（$1,800）' }),   // 正取已滿，可排候補
       S('a-5', 'm-1', 700),  S('a-5', 'm-2', 600), S('a-5', 'm-3', 500), S('a-5', 'm-4', 400), S('a-5', 'm-admin', 300),
     ];
-    return { members, activities, signups };
+    // 已經成團的活動視為「已通知過」
+    activities.forEach((a) => { if (signups.filter((s) => s.activity_id === a.id).length >= a.threshold) a.reached_notified_at = iso(300); });
+    const about = '## 關於出走社\n這是體驗模式的示範內容，正式網站的內容由管理員在後台編輯。\n\n## 社群規範\n- 接龍就是承諾，成團後請準時付款\n- 臨時不能參加，請私訊管理員';
+    const notices = [{
+      id: uid('n'), to: 'm-admin', at: iso(90),
+      text: `🙋【自揪申請待審核】週日陽明山健行（擎天崗大草原）\n${when(activities[6])}\n申請人：小美\n請到後台「活動管理 → 待審核」審核\n${LIFF_URL}?page=review`,
+    }];
+    return { members, activities, signups, about, notices };
   }
 
   function load() {
-    try { const raw = localStorage.getItem(KEY); if (raw) return JSON.parse(raw); } catch (e) {}
-    const db = seed();
+    try { const raw = localStorage.getItem(KEY); if (raw) { const db = JSON.parse(raw); if (db.notices) return db; } } catch (e) {}
+    const db = seed();   // 沒有資料，或是舊版體驗模式的資料 → 重新建立
     save(db);
     return db;
   }
   function save(db) { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) {} }
 
+  // ---------- 模擬 LINE 通知 ----------
+  function when(a) {
+    const [y, m, d] = a.event_date.split('-').map(Number);
+    const wd = '日一二三四五六'[new Date(y, m - 1, d).getDay()];
+    return `${m}/${d}（${wd}）${a.time_text ? ' ' + a.time_text : ''}`;
+  }
+  function pushLine(db, memberIds, text) {
+    const at = new Date().toISOString();
+    [...new Set(memberIds.filter(Boolean))].forEach((to) => db.notices.push({ id: uid('n'), to, at, text }));
+  }
+  const adminIds = (db) => db.members.filter((m) => m.is_admin && m.status === 'approved').map((m) => m.id);
+  const evLink = (id) => `${LIFF_URL}?ev=${id}`;
+  function maybeNotifyReached(db, a) {
+    const list = active(db).filter((s) => s.activity_id === a.id).sort((x, y) => x.created_at.localeCompare(y.created_at));
+    if (a.status !== 'open' || a.reached_notified_at || list.length < a.threshold) return;
+    a.reached_notified_at = new Date().toISOString();
+    const price = a.price ? `$${Number(a.price).toLocaleString('en-US')}${a.price_note ? `（${a.price_note}）` : ''}` : '免費';
+    const pay = a.booking_url ? `請在活動前 7 天完成預約付款（以付款順序為準）：\n${a.booking_url}`
+      : a.category === 'member' ? '付款方式請留意揪團人在 LINE 社群的說明。'
+      : '管理員會在 LINE 社群公告付款方式，請留意訊息。';
+    pushLine(db, list.slice(0, a.capacity).map((s) => s.member_id),
+      `🎉【成團通知】${a.title}\n${when(a)}\n已達 ${a.threshold} 人開班門檻，活動確定舉行！\n費用：${price}\n${pay}\n\n活動頁：${evLink(a.id)}`);
+    const staff = adminIds(db);
+    if (a.category === 'member') staff.push(a.created_by);
+    pushLine(db, staff,
+      `✅【成團】${a.title}\n${when(a)}・目前 ${list.length}／${a.capacity} 人（門檻 ${a.threshold} 人）\n` +
+      (a.booking_url ? '團員已收到預約付款通知。' : '這場沒有預約付款連結，請到 LINE 社群公告付款方式。') + `\n${evLink(a.id)}`);
+  }
+
   // ---------- 規則（對照 supabase/functions/api/index.ts） ----------
   class ApiError extends Error { constructor(status, code) { super(code); this.status = status; this.code = code; } }
   const memberOut = (m) => ({ nickname: m.nickname, is_admin: m.is_admin, status: m.status });
   const active = (db) => db.signups.filter((s) => !s.cancelled_at);
+  const nickOf = (db, id) => db.members.find((m) => m.id === id) || {};
+  const todayTw = () => dayAfter(0);
 
   function requireMember(m) { if (!m) throw new ApiError(403, 'no_nickname'); return m; }
   function requireApproved(m) { requireMember(m); if (m.status !== 'approved') throw new ApiError(403, m.status); return m; }
   function requireAdmin(m) { requireApproved(m); if (!m.is_admin) throw new ApiError(403, 'not_admin'); return m; }
+
+  function cleanOptions(v) {
+    if (typeof v !== 'string') return null;
+    const list = v.split(/\r?\n/).map((x) => x.trim().slice(0, 40)).filter(Boolean).slice(0, 10);
+    return list.length ? list.join('\n') : null;
+  }
+  function cleanActivity(a) {
+    const str = (v, max = 200) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
+    const out = {
+      category: str(a.category), title: str(a.title), host_name: str(a.host_name), event_date: str(a.event_date),
+      time_text: str(a.time_text, 50) || null, place: str(a.place) || null, price: Number(a.price ?? 0),
+      price_note: str(a.price_note) || null, capacity: Number(a.capacity), threshold: Number(a.threshold),
+      description: str(a.description, 4000) || null, booking_url: str(a.booking_url, 500) || null,
+      options: cleanOptions(a.options), wait_max: Number(a.wait_max ?? 0),
+      images: Array.isArray(a.images) ? [...new Set(a.images.map(String))] : [],
+    };
+    if (out.images.length > 3) throw new ApiError(400, 'bad_images');
+    if (out.booking_url && !/^https?:\/\//.test(out.booking_url)) throw new ApiError(400, 'bad_booking_url');
+    if (!(out.wait_max >= 0 && out.wait_max <= 20)) throw new ApiError(400, 'bad_wait_max');
+    if (!['host', 'select', 'member', 'social'].includes(out.category)) throw new ApiError(400, 'bad_category');
+    if (!out.title || !out.host_name) throw new ApiError(400, 'missing_fields');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(out.event_date)) throw new ApiError(400, 'bad_date');
+    if (!(out.price >= 0)) throw new ApiError(400, 'bad_price');
+    if (!(out.capacity >= 1) || !(out.threshold >= 1)) throw new ApiError(400, 'bad_numbers');
+    if (out.threshold > out.capacity) throw new ApiError(400, 'threshold_over_capacity');
+    return out;
+  }
+  function cleanupImages(db, paths) {
+    paths.forEach((p) => {
+      if (!db.activities.some((a) => (a.images || []).includes(p))) { try { localStorage.removeItem(IMG_PREFIX + p); } catch (e) {} }
+    });
+  }
+  function activityOut(db, a, viewer) {
+    const own = a.created_by === viewer.id;
+    const c = nickOf(db, a.created_by);
+    const { reached_notified_at, created_by, review_note, ...rest } = a;
+    return {
+      ...rest, mine_created: own,
+      ...(viewer.is_admin || own ? { review_note } : { created_at: undefined }),
+      ...(viewer.is_admin ? { proposer: c.nickname || null, proposer_line: c.line_name || null } : {}),
+    };
+  }
 
   function handle(body) {
     const persona = Object.values(PERSONAS).find((p) => 'demo-' + p.line === body.idToken);
@@ -86,12 +199,15 @@
 
       case 'data': {
         requireApproved(me);
-        const acts = db.activities.filter((a) => a.status === 'open').sort((a, b) => a.event_date.localeCompare(b.event_date) || a.created_at.localeCompare(b.created_at));
-        const ids = new Set(acts.map((a) => a.id));
+        const st = me.is_admin ? ['open', 'pending', 'rejected'] : ['open'];
+        const acts = db.activities.filter((a) => st.includes(a.status)).sort((a, b) => a.event_date.localeCompare(b.event_date) || a.created_at.localeCompare(b.created_at));
+        const ids = new Set(acts.filter((a) => a.status === 'open').map((a) => a.id));
         result = {
-          activities: acts,
+          activities: acts.map((a) => activityOut(db, a, me)),
+          myProposals: me.is_admin ? [] : db.activities.filter((a) => a.created_by === me.id && ['pending', 'rejected'].includes(a.status))
+            .sort((a, b) => b.created_at.localeCompare(a.created_at)).map((a) => activityOut(db, a, me)),
           signups: active(db).filter((s) => ids.has(s.activity_id)).sort((a, b) => a.created_at.localeCompare(b.created_at))
-            .map((s) => ({ activity_id: s.activity_id, nickname: db.members.find((m) => m.id === s.member_id)?.nickname })),
+            .map((s) => ({ activity_id: s.activity_id, nickname: nickOf(db, s.member_id).nickname, option: s.option })),
         };
         break;
       }
@@ -114,48 +230,136 @@
         requireApproved(me);
         const a = db.activities.find((x) => x.id === body.activityId && x.status === 'open');
         if (!a) { result = { result: 'not_found' }; break; }
+        const opts = a.options ? a.options.split('\n') : [];
+        let option = typeof body.option === 'string' ? body.option.trim() : null;
+        if (opts.length) { if (!option || !opts.includes(option)) throw new ApiError(400, 'bad_option'); } else option = null;
+        const note = typeof body.note === 'string' ? body.note.trim().slice(0, 100) || null : null;
         const list = active(db).filter((s) => s.activity_id === a.id);
         if (list.some((s) => s.member_id === me.id)) { result = { result: 'already_joined' }; break; }
-        if (list.length >= a.capacity) { result = { result: 'full' }; break; }
-        db.signups.push({ id: uid('s'), activity_id: a.id, member_id: me.id, created_at: new Date().toISOString(), cancelled_at: null });
-        const reached = list.length + 1 === a.threshold;
+        if (list.length >= a.capacity + (a.wait_max || 0)) { result = { result: 'full' }; break; }
+        db.signups.push({ id: uid('s'), activity_id: a.id, member_id: me.id, created_at: new Date().toISOString(), cancelled_at: null, option, note, paid: false });
         changed = true;
-        result = { result: reached ? 'reached' : 'ok' };
+        if (list.length >= a.capacity) { result = { result: 'waitlist' }; break; }
+        maybeNotifyReached(db, a);
+        result = { result: list.length + 1 === a.threshold ? 'reached' : 'ok' };
+        break;
+      }
+
+      case 'about':
+        requireApproved(me);
+        result = { body: db.about || '', updated_at: null };
+        break;
+
+      case 'upload_image': {
+        requireApproved(me);
+        const data = typeof body.data === 'string' ? body.data : '';
+        if (!/^data:image\/(jpeg|png|webp);base64,/.test(data)) throw new ApiError(400, 'bad_image');
+        const path = uid('img');
+        try { localStorage.setItem(IMG_PREFIX + path, data); }
+        catch (e) { throw new ApiError(400, 'image_too_large'); }   // 瀏覽器空間滿了：按「重來一次」清掉
+        result = { path };
+        break;
+      }
+
+      case 'propose_activity': {
+        requireApproved(me);
+        const a = cleanActivity({ ...(body.activity || {}), category: 'member' });
+        a.booking_url = null;
+        if (a.event_date < todayTw()) throw new ApiError(400, 'date_passed');
+        let notify = true;
+        if (body.id) {
+          const old = db.activities.find((x) => x.id === body.id);
+          if (!old || old.created_by !== me.id || !['pending', 'rejected'].includes(old.status)) throw new ApiError(404, 'not_found');
+          notify = old.status === 'rejected';
+          const oldImgs = old.images || [];
+          Object.assign(old, a, { status: 'pending', review_note: null });
+          cleanupImages(db, oldImgs.filter((p) => !a.images.includes(p)));
+        } else {
+          if (db.activities.filter((x) => x.created_by === me.id && x.status === 'pending').length >= 5) throw new ApiError(400, 'too_many_pending');
+          db.activities.push({ ...a, id: uid('a'), status: 'pending', created_by: me.id, review_note: null, reached_notified_at: null, created_at: new Date().toISOString() });
+        }
+        if (notify) pushLine(db, adminIds(db), `🙋【自揪申請待審核】${a.title}\n${when(a)}\n申請人：${me.nickname}\n請到後台「活動管理 → 待審核」審核\n${LIFF_URL}?page=review`);
+        changed = true;
+        result = { ok: true };
+        break;
+      }
+
+      case 'withdraw_proposal': {
+        requireApproved(me);
+        const old = db.activities.find((x) => x.id === body.id);
+        if (!old || old.created_by !== me.id || !['pending', 'rejected'].includes(old.status)) throw new ApiError(404, 'not_found');
+        db.activities = db.activities.filter((x) => x !== old);
+        cleanupImages(db, old.images || []);
+        changed = true;
+        result = { ok: true };
+        break;
+      }
+
+      case 'admin_review_activity': {
+        requireAdmin(me);
+        const approve = body.decision === 'approve';
+        if (!approve && body.decision !== 'reject') throw new ApiError(400, 'bad_decision');
+        const a = db.activities.find((x) => x.id === body.id && x.status === 'pending');
+        if (!a) throw new ApiError(409, 'not_pending');
+        const note = typeof body.note === 'string' ? body.note.trim().slice(0, 300) || null : null;
+        a.status = approve ? 'open' : 'rejected';
+        a.review_note = approve ? null : note;
+        pushLine(db, [a.created_by], approve
+          ? `🎉【自揪審核通過】${a.title}\n${when(a)}\n已經上架，大家可以開始接龍囉！\n${evLink(a.id)}`
+          : `↩️【自揪申請退回】${a.title}\n${when(a)}\n${note ? `原因：${note}\n` : ''}可以到網站「我的自揪」修改後重新送出。\n${LIFF_URL}?page=proposals`);
+        changed = true;
+        result = { ok: true };
+        break;
+      }
+
+      case 'admin_export': {
+        requireAdmin(me);
+        const ids = new Set(Array.isArray(body.activityIds) ? body.activityIds : []);
+        result = {
+          signups: active(db).filter((s) => ids.has(s.activity_id)).sort((a, b) => a.created_at.localeCompare(b.created_at)).map((s) => {
+            const m = nickOf(db, s.member_id);
+            return { activity_id: s.activity_id, created_at: s.created_at, nickname: m.nickname, line_name: m.line_name, option: s.option, note: s.note, paid: s.paid };
+          }),
+        };
         break;
       }
 
       case 'admin_save_activity': {
         requireAdmin(me);
-        const a = body.activity || {};
-        const clean = {
-          category: a.category, title: String(a.title || '').trim(), host_name: String(a.host_name || '').trim(),
-          event_date: a.event_date, time_text: a.time_text || null, place: a.place || null,
-          price: Number(a.price) || 0, price_note: a.price_note || null,
-          capacity: Number(a.capacity), threshold: Number(a.threshold), description: a.description || null,
-        };
-        if (!clean.title || !clean.host_name) throw new ApiError(400, 'missing_fields');
-        if (!(clean.capacity >= 1) || !(clean.threshold >= 1)) throw new ApiError(400, 'bad_numbers');
-        if (clean.threshold > clean.capacity) throw new ApiError(400, 'threshold_over_capacity');
-        if (body.id) Object.assign(db.activities.find((x) => x.id === body.id) || {}, clean);
-        else db.activities.push({ ...clean, id: uid('a'), status: 'open', created_at: new Date().toISOString() });
+        const a = cleanActivity(body.activity || {});
+        if (body.id) {
+          const old = db.activities.find((x) => x.id === body.id);
+          if (!old) throw new ApiError(404, 'not_found');
+          const oldImgs = old.images || [];
+          Object.assign(old, a);
+          cleanupImages(db, oldImgs.filter((p) => !a.images.includes(p)));
+          maybeNotifyReached(db, old);
+          result = { ok: true, created: 0 };
+        } else {
+          const dates = [...new Set([a.event_date, ...(Array.isArray(body.dates) ? body.dates.map(String) : [])])].slice(0, 20);
+          dates.forEach((d) => db.activities.push({ ...a, event_date: d, id: uid('a'), status: 'open', created_by: me.id, review_note: null, reached_notified_at: null, created_at: new Date().toISOString() }));
+          result = { ok: true, created: dates.length };
+        }
+        changed = true;
+        break;
+      }
+
+      case 'admin_delete_activity': {
+        requireAdmin(me);
+        const old = db.activities.find((x) => x.id === body.id);
+        db.activities = db.activities.filter((x) => x.id !== body.id);
+        db.signups = db.signups.filter((s) => s.activity_id !== body.id);
+        if (old) cleanupImages(db, old.images || []);
         changed = true;
         result = { ok: true };
         break;
       }
 
-      case 'admin_delete_activity':
-        requireAdmin(me);
-        db.activities = db.activities.filter((x) => x.id !== body.id);
-        db.signups = db.signups.filter((s) => s.activity_id !== body.id);
-        changed = true;
-        result = { ok: true };
-        break;
-
       case 'admin_roster':
         requireAdmin(me);
         result = {
           roster: active(db).filter((s) => s.activity_id === body.activityId).sort((a, b) => a.created_at.localeCompare(b.created_at))
-            .map((s) => { const m = db.members.find((x) => x.id === s.member_id) || {}; return { id: s.id, created_at: s.created_at, nickname: m.nickname, line_name: m.line_name }; }),
+            .map((s) => { const m = nickOf(db, s.member_id); return { id: s.id, created_at: s.created_at, nickname: m.nickname, line_name: m.line_name, option: s.option, note: s.note, paid: s.paid }; }),
         };
         break;
 
@@ -167,6 +371,22 @@
         result = { ok: true };
         break;
       }
+
+      case 'admin_set_paid': {
+        requireAdmin(me);
+        const s = db.signups.find((x) => x.id === body.signupId);
+        if (s) s.paid = body.paid === true;
+        changed = true;
+        result = { ok: true };
+        break;
+      }
+
+      case 'admin_save_about':
+        requireAdmin(me);
+        db.about = typeof body.body === 'string' ? body.body.slice(0, 20000) : '';
+        changed = true;
+        result = { ok: true };
+        break;
 
       case 'admin_members': {
         requireAdmin(me);
@@ -212,6 +432,21 @@
     }
     return realFetch(url, opts);
   };
+
+  // ---------- 圖片網址 ----------
+  // 存在瀏覽器裡的圖片轉成 blob: 網址（點圖片開新分頁看大圖時，瀏覽器不允許直接開 data: 網址）
+  const blobCache = {};
+  function imgUrl(path) {
+    if (path.startsWith('seed:')) return seedSvg(path);
+    if (blobCache[path]) return blobCache[path];
+    let data = null;
+    try { data = localStorage.getItem(IMG_PREFIX + path); } catch (e) {}
+    if (!data) return seedSvg('missing');
+    const [head, b64] = data.split(',');
+    const bin = atob(b64), bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return (blobCache[path] = URL.createObjectURL(new Blob([bytes], { type: head.slice(5, head.indexOf(';')) })));
+  }
 
   // ---------- 模擬 LINE 登入流程（只有社員頁） ----------
   // 正式網站：在 LINE 社群點連結 → 第一次會看到 LINE 的授權畫面 → 按「許可」→ 進網站。
@@ -313,6 +548,19 @@
   window.DemoBackend = {
     KEY,
     ROLE,
-    reset() { try { localStorage.removeItem(KEY); localStorage.removeItem(LINE_OK); } catch (e) {} },
+    imgUrl,
+    // 模擬 LINE 通知：mine＝寄給這一頁的人；all＝所有人（含示範社員）收到的
+    notices() {
+      const db = load();
+      const me = db.members.find((m) => m.line === PERSONAS[ROLE].line);
+      const list = [...db.notices].sort((a, b) => b.at.localeCompare(a.at))
+        .map((n) => ({ ...n, toName: nickOf(db, n.to).nickname || '（已刪除）', mine: !!me && n.to === me.id }));
+      return { mine: list.filter((n) => n.mine), all: list, meId: me?.id || null };
+    },
+    reset() {
+      try {
+        Object.keys(localStorage).filter((k) => k.startsWith('gwo-demo')).forEach((k) => localStorage.removeItem(k));
+      } catch (e) {}
+    },
   };
 })();

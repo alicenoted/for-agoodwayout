@@ -16,16 +16,17 @@
   }
   *{box-sizing:border-box}
   html,body{margin:0}
+  html{scrollbar-gutter:stable}   /* 一直預留捲軸的位置：切換頁面、開關視窗時寬度不會跳動 */
   body{background:var(--bg);color:var(--ink);font:15px/1.6 -apple-system,BlinkMacSystemFont,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;-webkit-font-smoothing:antialiased}
   button,input,select,textarea{font:inherit;color:inherit}
   button{cursor:pointer}
-  .wrap{max-width:1040px;margin:0 auto;padding:0 16px}
+  .wrap{max-width:1240px;margin:0 auto;padding:0 16px}
   .hidden{display:none!important}
 
   /* top bar */
   .top{position:sticky;top:0;z-index:20;background:rgba(246,248,247,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
   .top .wrap{display:flex;align-items:center;gap:12px;height:58px}
-  .logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:17px;letter-spacing:.02em}
+  .logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:17px;letter-spacing:.02em;white-space:nowrap}
   .logo-mark{width:32px;height:32px;border-radius:10px;background:var(--ink);color:#fff;display:grid;place-items:center;font-size:15px}
   .logo small{display:block;font-weight:500;font-size:11px;color:var(--muted);letter-spacing:.06em;line-height:1.1}
   .spacer{flex:1}
@@ -124,28 +125,57 @@
   .tab.on{background:var(--ink);border-color:var(--ink);color:#fff}
   .tab.on .n{color:#c9d6df}
 
+  .month-group{margin-bottom:22px}
+  .nav-link{font-size:14px;font-weight:600;color:var(--ink-2);text-decoration:none;padding:6px 10px;border-radius:10px;white-space:nowrap}
+  .nav-link:hover{background:var(--soft)}
+  @media (max-width:520px){.nav-link{font-size:13px;padding:6px 6px}}
+  .about-card{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);padding:24px 28px;max-width:820px;margin:24px auto 40px}
+  .back-link{display:inline-block;font-size:14px;color:var(--brand);text-decoration:none;margin-bottom:6px}
+  .about-body{font-size:15px;line-height:1.8;color:var(--ink-2);word-break:break-word}
+  .about-body h3{margin:22px 0 8px;font-size:18px;color:var(--ink)}
+  .about-body h3:first-child{margin-top:4px}
+  .about-body p{margin:0 0 12px}
+  .about-body ul{margin:0 0 12px;padding-left:22px}
+  .about-body a{color:var(--brand)}
+  .about-editor{font-family:inherit;font-size:14px;line-height:1.7;min-height:360px}
+  .content-actions{display:flex;align-items:center;justify-content:flex-end;gap:12px;margin-top:10px}
+  .roster li .opt{font-size:12px;color:var(--muted)}
+  .wait-head{margin:16px 0 8px;font-size:14px;color:var(--warn)}
+  .paid-toggle{display:flex;align-items:center;gap:4px;font-size:13px;color:var(--ink-2);white-space:nowrap;cursor:pointer}
+  .paid-toggle input{width:16px;height:16px;accent-color:var(--ok)}
+  .contact-list .meta{font-size:12px;color:var(--muted)}
+  .contact-list .meta b{color:var(--ink-2);font-weight:600}
+  .extra-dates{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .extra-dates .input{width:auto}
+  .ev-table{min-width:0}
+  .ev-table th:nth-child(1){width:120px} .ev-table th:nth-child(3){width:110px} .ev-table th:nth-child(4){width:170px} .ev-table th:nth-child(5){width:170px}
+  .ev-row{cursor:pointer}
+  .ev-row:hover td{background:#fafcfc}
+  .ev-row .t{font-weight:600}
+  /* 已結束的活動：底色變灰 */
+  .ev-row.ended td, .ev-row.ended:hover td{background:#eef1f3;color:var(--muted)}
+  .ev-row.ended .chip, .card.ended .chip{opacity:.6}
+  .card.ended{background:#eef1f3;box-shadow:none}
+  .card.ended h3, .card.ended .price{color:var(--muted)}
+  .mg-row td{background:#f3f6f7;font-weight:700;font-size:14px;color:var(--ink-2);padding:9px 14px}
+  .mine-tag{font-size:12px;font-weight:700;color:var(--ok);margin-top:4px}
+  @media (max-width:819px){
+    .ev-wrap{overflow:visible}
+    .ev-table, .ev-table tbody{display:block}
+    .ev-table thead{display:none}
+    .ev-row{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"date status" "main main" "cat cat" "prog prog";gap:6px 10px;padding:12px 14px;border-bottom:1px solid var(--line)}
+    .ev-row td{display:block;padding:0;border:0;background:transparent!important}
+    .ev-row.ended{background:#eef1f3}
+    .c-date{grid-area:date} .c-main{grid-area:main} .c-cat{grid-area:cat} .c-prog{grid-area:prog} .c-status{grid-area:status;text-align:right}
+    .c-date .sub{display:inline;margin-left:6px}
+    .mg-row{display:block} .mg-row td{display:block}
+  }
+  .mg-head{margin:0 0 10px;font-size:15px;font-weight:700;color:var(--ink-2)}
   .view-bar{display:flex;align-items:center;gap:10px;margin-bottom:12px}
   .view-bar .count{flex:1;font-size:14px;color:var(--muted)}
   .view-toggle{display:flex;background:var(--soft);border-radius:10px;padding:3px}
   .view-toggle button{display:flex;align-items:center;gap:5px;border:0;background:transparent;padding:5px 12px;border-radius:8px;font-size:13px;color:var(--muted)}
   .view-toggle button.on{background:var(--surface);color:var(--ink);font-weight:700;box-shadow:0 1px 4px rgba(0,0,0,.08)}
-  .rows{display:flex;flex-direction:column;background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
-  .row{display:grid;grid-template-columns:96px minmax(0,1fr) 150px 136px;gap:14px;align-items:center;width:100%;padding:14px 18px;border:0;border-bottom:1px solid var(--line);background:transparent;text-align:left;cursor:pointer}
-  .row:last-child{border-bottom:0}
-  .row:hover{background:#fafcfc}
-  .r-date b{display:block;font-size:15px}
-  .r-date span{font-size:13px;color:var(--muted)}
-  .r-title{font-weight:700;font-size:16px;line-height:1.4;margin-bottom:4px}
-  .r-meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
-  .r-meta .price{font-size:14px}
-  .r-status{display:flex;flex-direction:column;align-items:flex-start;gap:6px}
-  @media (max-width:1100px){
-    .row{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"date status" "main main" "prog prog";gap:6px 10px}
-    .r-date{grid-area:date;display:flex;gap:8px;align-items:baseline}
-    .r-main{grid-area:main}
-    .r-prog{grid-area:prog}
-    .r-status{grid-area:status;flex-direction:row;align-items:center}
-  }
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,280px),1fr));gap:14px}
   .card{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column;cursor:pointer;border:0;text-align:left;padding:0;transition:transform .15s, box-shadow .15s}
   .card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(23,50,77,.12)}
@@ -251,7 +281,6 @@
   .gate-card p{color:var(--muted);margin:0 0 18px}
   .gate-emoji{font-size:40px}
   .gate-actions{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
-  #adminView.wrap, body.is-admin .top .wrap{max-width:1240px}
   .admin-layout{display:grid;grid-template-columns:220px minmax(0,1fr);gap:28px;align-items:start;padding:24px 0 40px}
   .admin-side{position:sticky;top:78px;background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);padding:14px 10px}
   .side-head{font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.08em;padding:4px 12px 10px}
@@ -264,7 +293,7 @@
   .side-item.on .count-badge{background:#fff;color:var(--danger)}
   .admin-main .admin-head{padding:0 0 14px}
   @media (max-width:819px){
-    .admin-layout{grid-template-columns:1fr;gap:12px;padding-top:12px}
+    .admin-layout{grid-template-columns:minmax(0,1fr);gap:12px;padding-top:12px}   /* minmax(0,…)：寬表格只在框內左右滑，不撐寬整頁 */
     .admin-side{position:static;padding:6px}
     .side-head{display:none}
     .side-nav{flex-direction:row;overflow-x:auto}
@@ -275,6 +304,31 @@
   .tab.on .count-badge{background:#fff;color:var(--danger)}
   .badge.pending{background:var(--warn-soft);color:var(--warn)}
   .badge.admin{background:#e9e4f5;color:#5b4a8f}
+  /* 自揪、圖片、審核 */
+  .hero-actions{display:flex;gap:8px;flex-wrap:wrap}
+  .gallery{display:flex;gap:8px;overflow-x:auto;scroll-snap-type:x mandatory;scroll-padding:0 20px;margin:12px -20px 0;padding:0 20px;scrollbar-width:none}
+  .gallery::-webkit-scrollbar{display:none}
+  .gallery a{flex:none;width:min(78%,360px);aspect-ratio:4/3;border-radius:14px;overflow:hidden;background:var(--soft);scroll-snap-align:start}
+  .gallery a:only-child{width:100%}
+  .gallery img{width:100%;height:100%;object-fit:cover;display:block}
+  .card-cover{width:100%;aspect-ratio:16/9;object-fit:cover;display:block;background:var(--soft)}
+  .card.ended .card-cover{filter:grayscale(.7);opacity:.7}
+  .img-slots{display:flex;gap:10px;flex-wrap:wrap}
+  .img-slot{position:relative;width:104px;height:104px;border-radius:12px;overflow:hidden;background:var(--soft);flex:none}
+  .img-slot img{width:100%;height:100%;object-fit:cover;display:block}
+  .img-slot .rm{position:absolute;top:4px;right:4px;width:26px;height:26px;border-radius:50%;border:0;background:rgba(20,35,48,.7);color:#fff;font-size:15px;line-height:1}
+  .img-slot.busy{display:grid;place-items:center;font-size:12px;color:var(--muted)}
+  .img-add{width:104px;height:104px;border-radius:12px;border:1.5px dashed var(--line);background:#fff;color:var(--muted);font-size:13px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+  .img-add b{font-size:24px;font-weight:400;line-height:1}
+  .badge.review{background:#e9e4f5;color:#5b4a8f}
+  .badge.rejected{background:#f7e3df;color:var(--danger)}
+  .prop-list{list-style:none;margin:0;padding:0}
+  .prop-list li{padding:12px 0;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:6px}
+  .prop-list li:last-child{border-bottom:0}
+  .prop-list .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .prop-list .t{font-weight:700;flex:1;min-width:160px}
+  .reject-note{background:#f7e3df;color:#7a2e24;border-radius:10px;padding:8px 10px;font-size:13px}
+  .ev-filters{position:static;padding-top:0}
   .proto-note{font-size:12px;color:var(--muted);text-align:center;padding:0 0 28px}
   .proto-note button{border:0;background:none;color:var(--brand);text-decoration:underline;font-size:12px}
 
@@ -284,6 +338,23 @@
   .demo-banner b{font-size:14px;color:#18364b}
   .demo-link{color:#2f6f7e;font-weight:700;text-decoration:none;border:1.5px solid #9ec5ce;background:#fff;border-radius:999px;padding:3px 10px}
   .demo-btn{border:1.5px solid #e0c58e;background:#fff;color:#6e4c12;border-radius:999px;padding:3px 10px;font-size:13px;font-weight:700}
+  .demo-inbox{border-color:#06c755;color:#058a3c;display:inline-flex;align-items:center;gap:4px}
+  .demo-inbox .count-badge{background:#06c755}
+  /* 模擬 LINE 通知收件匣 */
+  .ln-head{background:#06c755;color:#fff}
+  .ln-head h2{color:#fff}
+  .ln-head .sub{color:rgba(255,255,255,.9)}
+  .ln-tabs{display:flex;gap:6px;margin-top:10px}
+  .ln-tabs button{border:0;border-radius:999px;padding:5px 12px;font-size:13px;background:rgba(255,255,255,.25);color:#fff}
+  .ln-tabs button.on{background:#fff;color:#058a3c;font-weight:700}
+  .ln-body{background:#8ca6c4;padding:16px 14px;min-height:240px}
+  .ln-msg{display:flex;gap:8px;align-items:flex-start;margin-bottom:14px}
+  .ln-av{width:34px;height:34px;border-radius:50%;background:#18364b;color:#fff;display:grid;place-items:center;font-weight:700;flex:none;font-size:14px}
+  .ln-meta{font-size:12px;color:#fff;margin-bottom:3px}
+  .ln-bubble{background:#fff;border-radius:4px 16px 16px 16px;padding:10px 12px;font-size:14px;line-height:1.55;color:#18364b;white-space:pre-line;word-break:break-word;max-width:420px}
+  .ln-bubble a{color:#2a6ad6}
+  .ln-new{display:inline-block;background:#e5483a;color:#fff;font-size:11px;border-radius:999px;padding:0 6px;margin-left:4px}
+  .ln-empty{color:#fff;text-align:center;padding:40px 0;font-size:14px}
   #modeSwitch{display:none!important}
 </style>
 </head>
@@ -293,6 +364,7 @@
   <span>假資料只存在這台電腦，不會影響正式網站</span>
   <span class="spacer"></span>
   <a class="demo-link" href="../member/" target="gwo-demo-member">開啟社員頁 ↗</a>
+  <button class="demo-btn demo-inbox" id="demoInbox" title="正式網站會用出走社官方帳號傳 LINE 訊息；體驗模式改放在這裡">📩 LINE 通知<span class="count-badge hidden" id="demoInboxN"></span></button>
   <button class="demo-btn" id="demoReset">重來一次</button>
 </div>
 
@@ -300,6 +372,7 @@
   <div class="wrap">
     <div class="logo"><div class="logo-mark">出</div><div>出走社<small>A GOOD WAY OUT</small></div></div>
     <div class="spacer"></div>
+    <a class="nav-link hidden" id="aboutLink" href="#about">關於出走社</a>
     <button class="me-chip hidden" id="meChip" data-editnick title="修改暱稱"></button>
     <div class="mode hidden" id="modeSwitch" role="tablist" aria-label="切換視角">
       <button data-mode="member" class="on">社員</button>
@@ -319,6 +392,10 @@
       <h1>本月一起出走 ✦</h1>
       <p>看看大家報了什麼，喜歡就 +1 接龍</p>
     </div>
+    <div class="hero-actions">
+      <button class="btn ghost sm" id="myProps">我的自揪<span class="count-badge hidden" id="myPropsBadge" style="background:var(--warn)"></span></button>
+      <button class="btn sm" id="newProposal" style="background:var(--c-member)">＋ 我要自揪</button>
+    </div>
   </section>
 
   <section class="howto" id="howto">
@@ -327,7 +404,7 @@
     <div class="steps">
       <div class="step"><b><i>1</i>挑活動</b>看日期、價格，還有誰已經報名</div>
       <div class="step"><b><i>2</i>+1 接龍</b>只要填暱稱，不用先付錢</div>
-      <div class="step"><b><i>3</i>成團後付款</b>人數到了，管理員會在 LINE 社群通知付款方式</div>
+      <div class="step"><b><i>3</i>成團後付款</b>人數到了，活動頁會出現預約付款連結</div>
     </div>
   </section>
 
@@ -353,8 +430,16 @@
           <button data-view="card"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><rect x="3" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5"/></svg>卡片</button>
         </div>
       </div>
-      <section class="grid" id="grid"></section>
+      <div id="grid"></div>
     </div>
+  </div>
+</main>
+
+<!-- 關於出走社（內容存在資料庫，只有通過審核的成員讀得到） -->
+<main id="aboutView" class="wrap hidden">
+  <div class="about-card">
+    <a class="back-link" href="#">‹ 回到活動</a>
+    <div class="about-body" id="aboutBody"><p class="sub">載入中…</p></div>
   </div>
 </main>
 
@@ -366,18 +451,29 @@
     <nav class="side-nav">
       <a class="side-item" href="#events" data-nav="events">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
-        <span>活動管理</span></a>
+        <span>活動管理</span><span class="count-badge hidden" id="reviewBadge"></span></a>
       <a class="side-item" href="#members" data-nav="members">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.4 3.3-5.5 6.5-5.5s5.9 2.1 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18.5 14.8c1.7.8 2.8 2.6 3 5.2"/></svg>
         <span>人員清單</span><span class="count-badge hidden" id="pendingBadge"></span></a>
+      <a class="side-item" href="#content" data-nav="content">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h12l4 4v12H4z"/><path d="M8 11h8M8 15h8M8 7h5"/></svg>
+        <span>關於出走社</span></a>
     </nav>
   </aside>
   <section class="admin-main">
   <div class="admin-head">
     <h1 id="adminTitle">活動管理</h1>
     <button class="btn sm" id="newEvent">＋ 新增活動</button>
+    <button class="btn ghost sm" id="exportXlsx">⬇ 下載 Excel</button>
     <button class="btn ghost sm hidden" id="exportCsv">⬇ 匯出試算表（CSV）</button>
   </div>
+  <section id="contentPanel" class="hidden">
+    <div class="callout info" style="margin-bottom:12px">✏️<div>這裡的內容會顯示在社員頁的「關於出走社」，只有通過審核的社員看得到。<br>格式：<b>## </b>開頭＝標題、<b>- </b>開頭＝項目、空一行＝分段、網址會自動變成連結。</div></div>
+    <textarea class="input about-editor" id="aboutEditor" rows="22"></textarea>
+    <div class="content-actions"><span class="sub" id="aboutSaved"></span><button class="btn" id="saveAbout">儲存</button></div>
+    <h4 style="margin:18px 0 8px">預覽</h4>
+    <div class="about-card" style="margin:0"><div class="about-body" id="aboutPreview"></div></div>
+  </section>
   <section id="membersPanel" class="hidden">
     <nav class="tabs" id="memberFilters" style="position:static;padding-top:0"></nav>
     <div class="table-wrap">
@@ -387,11 +483,14 @@
       </table>
     </div>
   </section>
-  <div class="table-wrap" id="eventsPanel">
+  <div id="eventsPanel">
+  <nav class="tabs ev-filters" id="eventFilters"></nav>
+  <div class="table-wrap">
     <table>
       <thead><tr><th>日期</th><th>活動</th><th>類別</th><th>接龍 / 門檻 / 名額</th><th>狀態</th><th>操作</th></tr></thead>
       <tbody id="adminRows"></tbody>
     </table>
+  </div>
   </div>
   </section>
  </div>
@@ -410,7 +509,10 @@ const CONFIG = {
   liffId: '2012620335-Hk2HkkYY',
   supabaseUrl: 'https://qceomzxgeqromtbdxinf.supabase.co',
   supabaseKey: 'sb_publishable_APl0aO_S_l2nIOZaWbG6Bg_qSazW7zw',
+  imageBucket: 'activity-images',
+  xlsxLib: 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',   // 下載 Excel 時才載入
 };
+const imgUrl = (path)=>DemoBackend.imgUrl(path);
 
 /* ---------- 基本設定 ---------- */
 const CATS = {
@@ -425,8 +527,8 @@ const pad = (n)=>String(n).padStart(2,'0');
 const TODAY = new Date();
 const todayKey = `${TODAY.getFullYear()}-${pad(TODAY.getMonth()+1)}-${pad(TODAY.getDate())}`;
 
-let state = { events: [], me: null, mine: new Set(), idToken: null, members: [] };
-let ui = { mode:'member', cat:'all', ym:[TODAY.getFullYear(), TODAY.getMonth()], day:null, atab:'events', mfilter:'all' };
+let state = { events: [], myProposals: [], me: null, mine: new Set(), idToken: null, members: [] };
+let ui = { mode:'member', cat:'all', ym:[TODAY.getFullYear(), TODAY.getMonth()], day:null, atab:'events', mfilter:'all', efilter:'open' };
 let prefs = { hideHowto:false, view:'list' };   // view：活動顯示方式，預設列表
 try{ prefs = { ...prefs, ...JSON.parse(localStorage.getItem('gwo-prefs') || '{}') }; }catch(e){}
 function savePrefs(){ try{ localStorage.setItem('gwo-prefs', JSON.stringify(prefs)); }catch(e){} }
@@ -468,16 +570,23 @@ function relogin(){
 }
 
 async function loadData(){
-  const { activities: acts, signups: sus } = await api('data');
+  const { activities: acts, signups: sus, myProposals } = await api('data');
   const by = {};
-  sus.forEach(s=>{ (by[s.activity_id] ||= []).push({ nick:s.nickname }); });
-  state.events = acts.map(a=>({
+  sus.forEach(s=>{ (by[s.activity_id] ||= []).push({ nick:s.nickname, option:s.option||'' }); });
+  const toEv = (a)=>({
     id:a.id, cat:a.category, title:a.title, host:a.host_name, date:a.event_date,
     time:a.time_text||'', place:a.place||'', price:a.price, priceNote:a.price_note||'',
     capacity:a.capacity, threshold:a.threshold, desc:a.description||'',
+    booking:a.booking_url||'', options:a.options ? a.options.split('\n') : [], waitMax:a.wait_max||0,
+    images:a.images||[], status:a.status||'open', mineCreated:!!a.mine_created,
+    reviewNote:a.review_note||'', submittedAt:a.created_at||'', proposer:a.proposer||'', proposerLine:a.proposer_line||'',
     signups: by[a.id] || [],
-  }));
+  });
+  state.events = acts.map(toEv);
+  state.myProposals = (myProposals || []).map(toEv);
 }
+// 社員看得到的活動（管理員的 state.events 裡還有待審核／已退回的自揪申請）
+const openEvents = ()=>state.events.filter(e=>e.status==='open');
 const isApproved = ()=>state.me?.status === 'approved';
 async function loadMembers(){
   const r = await api('admin_members');
@@ -488,27 +597,35 @@ async function loadMe(){
   state.me = r.member;
   state.mine = new Set(r.mySignups || []);
 }
-const findEv = (id)=>state.events.find(e=>e.id===id);
+const findEv = (id)=>state.events.find(e=>e.id===id) || state.myProposals.find(e=>e.id===id);
 const isMine = (ev)=>state.mine.has(ev.id);
 
+// n＝正取人數（最多到名額上限）、waitN＝候補人數
 function info(ev){
-  const n = ev.signups.length, reached = n >= ev.threshold, ended = ev.date < todayKey;
+  const total = ev.signups.length, wm = ev.waitMax || 0;
+  const n = Math.min(total, ev.capacity), waitN = Math.max(0, total - ev.capacity);
+  const reached = n >= ev.threshold, ended = ev.date < todayKey;
   let status, cls;
   if(ended){ status='已結束'; cls='closed'; }
-  else if(n >= ev.capacity){ status='額滿'; cls='closed'; }
+  else if(total >= ev.capacity + wm){ status='額滿'; cls='closed'; }
+  else if(total >= ev.capacity){ status=`額滿・可候補 ${ev.capacity + wm - total} 位`; cls='full'; }
   else if(reached){ status=`已成團・剩 ${ev.capacity-n} 位`; cls='go'; }
   else { status=`接龍中・差 ${ev.threshold-n} 人成團`; cls='open'; }
-  return { n, reached, ended, status, cls, left:Math.max(0, ev.capacity-n), canJoin: !ended && n < ev.capacity };
+  return { n, total, waitN, reached, ended, status, cls, left:Math.max(0, ev.capacity-n),
+           canJoin: !ended && total < ev.capacity + wm, isWait: total >= ev.capacity };
 }
+// 我在這場的位置：-1＝沒接龍；>= 名額＝候補中
+const myIndex = (ev)=> isMine(ev) ? ev.signups.findIndex(s=>s.nick===state.me?.nickname) : -1;
+const amWaiting = (ev)=> myIndex(ev) >= ev.capacity;
 function monthEvents(){
   const [y,m]=ui.ym;
-  return state.events.filter(e=>{ const d=parseD(e.date); return d.getFullYear()===y && d.getMonth()===m; });
+  return openEvents().filter(e=>{ const d=parseD(e.date); return d.getFullYear()===y && d.getMonth()===m; });
 }
 
 /* ---------- 畫面 ---------- */
 function render(){
   const admin = !!state.me?.is_admin && isApproved();
-  if(!admin) ui.mode = 'member';
+  if(!admin && ui.mode === 'admin') ui.mode = 'member';
   const gated = !!state.me && !isApproved();
   $('#gateView').classList.toggle('hidden', !gated);
   if(gated){
@@ -522,26 +639,55 @@ function render(){
     return;
   }
   $('#modeSwitch').classList.toggle('hidden', !admin);
-  document.querySelectorAll('#modeSwitch button').forEach(b=>b.classList.toggle('on', b.dataset.mode===ui.mode));
+  document.querySelectorAll('#modeSwitch button').forEach(b=>b.classList.toggle('on', b.dataset.mode===(ui.mode==='admin' ? 'admin' : 'member')));
+  $('#aboutLink').classList.toggle('hidden', !isApproved() || ui.mode !== 'member');
   const chip = $('#meChip');
   chip.classList.toggle('hidden', !state.me);
   if(state.me) chip.innerHTML = `${av(state.me.nickname)}<span>${esc(state.me.nickname)}</span>`;
   $('#memberView').classList.toggle('hidden', ui.mode!=='member');
+  $('#aboutView').classList.toggle('hidden', ui.mode!=='about');
   $('#adminView').classList.toggle('hidden', ui.mode!=='admin');
-  document.body.classList.toggle('is-admin', ui.mode==='admin');
-  if(ui.mode==='member') renderMember(); else renderAdmin();
+  if(ui.mode==='member') renderMember(); else if(ui.mode==='about') renderAbout(); else renderAdmin();
 }
 
-// 網址尾巴決定後台顯示哪一頁：#events 活動管理、#members 人員清單；沒有尾巴 = 社員畫面
-const ADMIN_PAGES = ['events', 'members'];
+// 網址尾巴決定顯示哪一頁：#events 活動管理、#members 人員清單、#content 編輯關於出走社（後台）；
+// #about 關於出走社（社員）；沒有尾巴 = 社員的活動畫面
+const ADMIN_PAGES = ['events', 'members', 'content'];
 function routeFromHash(){
   const h = location.hash.slice(1);
   if(ADMIN_PAGES.includes(h) && state.me?.is_admin && isApproved()){ ui.mode = 'admin'; ui.atab = h; }
+  else if(h === 'about' && isApproved()) ui.mode = 'about';
   else ui.mode = 'member';
+}
+
+/* ---------- 關於出走社 ---------- */
+// 簡單排版：## 標題、- 項目、空行分段、網址自動變連結
+function formatText(t){
+  const link = (x)=>x.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
+  let html = '', para = [], inList = false;
+  const flush = ()=>{ if(para.length){ html += `<p>${link(para.join('<br>'))}</p>`; para = []; } };
+  const closeList = ()=>{ if(inList){ html += '</ul>'; inList = false; } };
+  for(const raw of esc(t).split('\n')){
+    const l = raw.trimEnd();
+    if(l.startsWith('## ')){ flush(); closeList(); html += `<h3>${link(l.slice(3))}</h3>`; }
+    else if(l.startsWith('- ')){ flush(); if(!inList){ html += '<ul>'; inList = true; } html += `<li>${link(l.slice(2))}</li>`; }
+    else if(!l.trim()){ flush(); closeList(); }
+    else { closeList(); para.push(l); }
+  }
+  flush(); closeList();
+  return html;
+}
+async function loadAbout(){
+  const r = await api('about');
+  state.about = r.body || '';
+}
+async function renderAbout(){
+  if(state.about == null){ try{ await loadAbout(); }catch(e){ $('#aboutBody').innerHTML = '<p class="err">載入失敗，請稍後再試</p>'; return; } }
+  $('#aboutBody').innerHTML = state.about.trim() ? formatText(state.about) : '<p class="sub">管理員還沒有填寫內容。</p>';
 }
 async function applyRoute(){
   routeFromHash(); closeModal(); render(); window.scrollTo(0,0);
-  if(ui.mode === 'admin'){ try{ await loadMembers(); render(); }catch(e){} }
+  if(ui.mode === 'admin'){ try{ await loadMembers(); if(ui.atab === 'content' && state.about == null) await loadAbout(); render(); }catch(e){} }
 }
 window.addEventListener('hashchange', applyRoute);
 
@@ -559,52 +705,90 @@ function progress(ev, i){
   const pct = Math.min(100, i.n/ev.capacity*100);
   const th = ev.threshold/ev.capacity*100;
   return `<div class="prog"><div class="fill ${i.reached?'go':''}" style="width:${pct}%"></div><div class="th" style="left:calc(${th}% - 1px)" title="開班門檻 ${ev.threshold} 人"></div></div>
-    <div class="prog-label"><span><b>${i.n}</b> / ${ev.capacity} 人</span><span>${ev.threshold} 人成團</span></div>`;
+    <div class="prog-label"><span><b>${i.n}</b> / ${ev.capacity} 人${i.waitN ? `・候補 ${i.waitN}` : ''}</span><span>${ev.threshold} 人成團</span></div>`;
 }
 
-function renderMember(){
-  const [y,m]=ui.ym;
-  const monthText = y === TODAY.getFullYear() ? `${m+1}月` : `${y}年 ${m+1}月`;
-  $('#monthLabel').textContent = monthText;
-  $('#catHead').textContent = `${monthText}活動類別`;
-  $('#howto').classList.toggle('hidden', prefs.hideHowto);
-  const list = monthEvents();
+const monthName = (y, m)=> y === TODAY.getFullYear() ? `${m+1}月` : `${y}年 ${m+1}月`;
 
-  const counts = {all:list.length}; Object.keys(CATS).forEach(k=>counts[k]=list.filter(e=>e.cat===k).length);
-  $('#tabs').innerHTML = `<button class="cat-item ${ui.cat==='all'?'on':''}" data-cat="all"><span class="dot" style="background:var(--ink-2)"></span>全部活動<span class="n">${counts.all}</span></button>` +
-    Object.entries(CATS).map(([k,c])=>`<button class="cat-item ${ui.cat===k?'on':''}" data-cat="${k}"><span class="dot" style="background:${c.color}"></span>${c.name}<span class="n">${counts[k]}</span></button>`).join('');
-
-  const catList = list.filter(e=>ui.cat==='all'||e.cat===ui.cat);
-  renderCalendar(catList);
-  const shown = ui.day ? catList.filter(e=>e.date===ui.day) : catList;
-  const view = prefs.view === 'card' ? 'card' : 'list';
-  document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('on', b.dataset.view===view));
-  $('#resultCount').textContent = `${ui.day ? fmtDate(ui.day) : monthText}・${shown.length} 場活動`;
-  $('#grid').className = view === 'card' ? 'grid' : 'rows';
-  $('#dayBar').innerHTML = ui.day ? `<div class="day-bar"><b>${fmtDate(ui.day)} 的活動・${shown.length} 場</b><button class="btn ghost sm" data-dayclear>顯示整個月</button></div>` : '';
-  $('#grid').innerHTML = !shown.length ? `<div class="empty">${ui.day ? '這天沒有這一類的活動 🍃' : '這個月這一類還沒有活動 🍃'}</div>`
-    : view === 'list' ? shown.map(ev=>{
-    const i=info(ev), c=CATS[ev.cat];
-    return `<button class="row" data-open="${ev.id}">
-      <div class="r-date"><b>${fmtDate(ev.date)}</b><span>${esc(ev.time)}</span></div>
-      <div class="r-main"><div class="r-title">${esc(ev.title)}</div>
-        <div class="r-meta"><span class="chip" style="background:${c.color}">${c.name}</span><span class="price">${money(ev.price)}</span>${ev.priceNote?`<span>${esc(ev.priceNote)}</span>`:''}</div></div>
-      <div class="r-prog">${progress(ev,i)}</div>
-      <div class="r-status"><span class="badge ${i.cls}">${i.status}</span>${isMine(ev)?'<span class="badge go">✓ 你已接龍</span>':''}</div>
-    </button>`;
-  }).join('') : shown.map(ev=>{
-    const i=info(ev), c=CATS[ev.cat];
-    const faces = ev.signups.slice(0,7).map(s=>av(s.nick)).join('');
-    const more = ev.signups.length>7 ? `+${ev.signups.length-7}` : '';
-    return `<button class="card" data-open="${ev.id}">
+function rowHtml(ev){
+  const i=info(ev), c=CATS[ev.cat];
+  return `<tr class="ev-row${i.ended ? ' ended' : ''}" data-open="${ev.id}">
+      <td class="c-date">${fmtDate(ev.date)}<div class="sub">${esc(ev.time)}</div></td>
+      <td class="c-main"><div class="t">${esc(ev.title)}</div><div class="sub">${money(ev.price)}・${esc(ev.host)}</div></td>
+      <td class="c-cat"><span class="chip" style="background:${c.color}">${c.name}</span></td>
+      <td class="c-prog">${progress(ev,i)}</td>
+      <td class="c-status"><span class="badge ${i.cls}">${i.status}</span>${isMine(ev) ? (amWaiting(ev) ? '<div class="mine-tag" style="color:var(--warn)">⏳ 你在候補</div>' : '<div class="mine-tag">✓ 你已接龍</div>') : ''}</td>
+    </tr>`;
+}
+function cardHtml(ev){
+  const i=info(ev), c=CATS[ev.cat];
+  const faces = ev.signups.slice(0,7).map(s=>av(s.nick)).join('');
+  const more = ev.signups.length>7 ? `+${ev.signups.length-7}` : '';
+  return `<button class="card${i.ended ? ' ended' : ''}" data-open="${ev.id}">
+      ${ev.images.length ? `<img class="card-cover" src="${esc(imgUrl(ev.images[0]))}" alt="" loading="lazy">` : ''}
       <div class="card-body">
         <div class="meta-row"><span class="chip" style="background:${c.color}">${c.name}</span><span class="date">${fmtDate(ev.date)} ${esc(ev.time)}</span></div>
         <h3>${esc(ev.title)}</h3>
         <div class="meta-row"><span class="price">${money(ev.price)}</span><span class="sub">${esc(ev.priceNote)}</span><span class="spacer"></span><span class="badge ${i.cls}">${i.status}</span></div>
         <div>${progress(ev,i)}</div>
-        <div class="faces">${faces || (i.ended ? '' : '<span class="sub">還沒有人報名，當第一個吧！</span>')}${more?`<span class="more">${more}</span>`:''}${isMine(ev)?'<span class="spacer"></span><span class="badge go">✓ 你已接龍</span>':''}</div>
+        <div class="faces">${faces || (i.ended ? '' : '<span class="sub">還沒有人報名，當第一個吧！</span>')}${more?`<span class="more">${more}</span>`:''}${isMine(ev) ? (amWaiting(ev) ? '<span class="spacer"></span><span class="badge full">⏳ 你在候補</span>' : '<span class="spacer"></span><span class="badge go">✓ 你已接龍</span>') : ''}</div>
       </div></button>`;
-  }).join('');
+}
+
+function renderMember(){
+  const [y,m]=ui.ym;
+  const monthText = monthName(y, m);
+  $('#monthLabel').textContent = monthText;
+  $('#catHead').textContent = `${monthText}活動類別`;
+  $('#howto').classList.toggle('hidden', prefs.hideHowto);
+  const rejectedN = state.myProposals.filter(e=>e.status==='rejected').length;
+  $('#myPropsBadge').textContent = rejectedN; $('#myPropsBadge').classList.toggle('hidden', !rejectedN);
+  $('#myProps').classList.toggle('hidden', !!state.me?.is_admin && !state.myProposals.length && !state.events.some(e=>e.mineCreated));
+
+  // 側邊欄：類別數字與月曆，跟著月曆顯示的月份
+  const list = monthEvents();
+  const counts = {all:list.length}; Object.keys(CATS).forEach(k=>counts[k]=list.filter(e=>e.cat===k).length);
+  $('#tabs').innerHTML = `<button class="cat-item ${ui.cat==='all'?'on':''}" data-cat="all"><span class="dot" style="background:var(--ink-2)"></span>全部活動<span class="n">${counts.all}</span></button>` +
+    Object.entries(CATS).map(([k,c])=>`<button class="cat-item ${ui.cat===k?'on':''}" data-cat="${k}"><span class="dot" style="background:${c.color}"></span>${c.name}<span class="n">${counts[k]}</span></button>`).join('');
+  const inCat = (e)=>ui.cat==='all' || e.cat===ui.cat;
+  renderCalendar(list.filter(inCat));
+
+  // 右邊：從這個月開始一路往下列出所有活動，依月份分段（點了日曆某天則只看那天）
+  const thisMonth = `${TODAY.getFullYear()}-${pad(TODAY.getMonth()+1)}`;
+  const shown = ui.day ? openEvents().filter(e=>inCat(e) && e.date===ui.day)
+                       : openEvents().filter(e=>inCat(e) && e.date.slice(0,7) >= thisMonth);
+  const view = prefs.view === 'card' ? 'card' : 'list';
+  document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('on', b.dataset.view===view));
+  $('#resultCount').textContent = ui.day ? `${fmtDate(ui.day)}・${shown.length} 場活動` : `共 ${shown.length} 場活動`;
+  $('#dayBar').innerHTML = ui.day ? `<div class="day-bar"><b>${fmtDate(ui.day)} 的活動・${shown.length} 場</b><button class="btn ghost sm" data-dayclear>顯示全部</button></div>` : '';
+  if(!shown.length){
+    $('#grid').innerHTML = `<div class="empty">${ui.day ? '這天沒有這一類的活動 🍃' : '目前沒有這一類的活動 🍃'}</div>`;
+    return;
+  }
+  const groups = [];
+  shown.forEach(ev=>{
+    const key = ev.date.slice(0,7);
+    if(!groups.length || groups[groups.length-1].key !== key) groups.push({ key, items: [] });
+    groups[groups.length-1].items.push(ev);
+  });
+  const groupTitle = (g)=>{ const [gy, gm] = g.key.split('-').map(Number); return `${monthName(gy, gm-1)}・${g.items.length} 場活動`; };
+  // 列表：跟後台活動表格相同的欄位（日期｜活動｜類別｜接龍/門檻/名額｜狀態），月份用分隔列
+  $('#grid').innerHTML = view === 'list'
+    ? `<div class="table-wrap ev-wrap"><table class="ev-table">
+        <thead><tr><th>日期</th><th>活動</th><th>類別</th><th>接龍 / 門檻 / 名額</th><th>狀態</th></tr></thead>
+        <tbody>${groups.map(g=>(ui.day ? '' : `<tr class="mg-row" id="m-${g.key}"><td colspan="5">${groupTitle(g)}</td></tr>`) + g.items.map(rowHtml).join('')).join('')}</tbody>
+      </table></div>`
+    : groups.map(g=>`<section class="month-group" id="m-${g.key}">
+        ${ui.day ? '' : `<h3 class="mg-head">${groupTitle(g)}</h3>`}
+        <div class="grid">${g.items.map(cardHtml).join('')}</div>
+      </section>`).join('');
+}
+
+// 電腦版：切換月曆月份時，右邊列表捲到那個月（手機版月曆在上方，不自動捲動）
+function scrollToMonth(){
+  if(window.innerWidth < 820) return;
+  const el = document.getElementById(`m-${ui.ym[0]}-${pad(ui.ym[1]+1)}`);
+  if(el) window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 80, behavior: 'smooth' });
 }
 
 function renderCalendar(list){
@@ -628,35 +812,54 @@ function renderCalendar(list){
 }
 
 /* ---------- 活動詳情（接龍） ---------- */
+// 活動圖片：橫向滑動，點一下開原圖
+function galleryHtml(ev){
+  if(!ev.images.length) return '';
+  return `<div class="gallery">${ev.images.map((p,k)=>`<a href="${esc(imgUrl(p))}" target="_blank" rel="noopener"><img src="${esc(imgUrl(p))}" alt="活動照片 ${k+1}" loading="lazy"></a>`).join('')}</div>`;
+}
 function openDetail(id){
   const ev = findEv(id); if(!ev){ closeModal(); return; }
   const i=info(ev), c=CATS[ev.cat], mine=isMine(ev);
-  const myNick = state.me?.nickname;
+  const myNick = state.me?.nickname, myIdx = myIndex(ev), waiting = myIdx >= ev.capacity;
+  const optTag = (s)=> s.option ? `<span class="opt">・${esc(s.option.split('（')[0])}</span>` : '';
+  const li = (s, label, cls)=>`<li class="${cls} ${s.nick===myNick?'me':''}">${av(s.nick)}<span>${esc(s.nick)}${s.nick===myNick?'（我）':''}${optTag(s)}</span><span class="no">${label}</span></li>`;
 
-  const slots = i.ended ? 0 : Math.max(0, Math.min(ev.capacity - i.n, 12));
-  const roster = ev.signups.map((s,k)=>`<li class="${s.nick===myNick?'me':''}">${av(s.nick)}${esc(s.nick)}${s.nick===myNick?'（我）':''}<span class="no">${k+1}</span></li>`).join('')
-    + Array.from({length:slots},(_,k)=>`<li class="slot">${i.n+k+1}. 空位</li>`).join('');
+  const main = ev.signups.slice(0, ev.capacity), wait = ev.signups.slice(ev.capacity);
+  const slots = i.ended ? 0 : Math.max(0, Math.min(ev.capacity - main.length, 12));
+  const roster = main.map((s,k)=>li(s, k+1, '')).join('')
+    + Array.from({length:slots},(_,k)=>`<li class="slot">${main.length+k+1}. 空位</li>`).join('');
+  const waitList = ev.waitMax ? `<div class="wait-head">候補 ${wait.length} / ${ev.waitMax}</div>${wait.length ? `<ul class="roster">${wait.map((s,k)=>li(s, `候補 ${k+1}`, 'wait')).join('')}</ul>` : '<div class="sub">目前沒有候補</div>'}` : '';
 
+  const payBtn = ev.booking ? `<div style="margin-top:10px"><a class="btn sm" href="${esc(ev.booking)}" target="_blank" rel="noopener">前往預約付款 ↗</a></div>` : '';
   let callout = '';
-  if(mine && i.reached){
-    callout = `<div class="callout go">🎉<div><b>已成團！</b>管理員會在 LINE 社群通知大家付款方式，請留意社群訊息。</div></div>`;
+  if(mine && waiting){
+    callout = `<div class="callout warn">⏳<div><b>你在候補第 ${myIdx - ev.capacity + 1} 位</b>有人取消時會依序遞補，管理員會通知你。</div></div>`;
+  } else if(mine && i.reached){
+    callout = ev.booking
+      ? `<div class="callout go">🎉<div><b>已成團！請完成預約付款</b>報名以付款順序為準，最遲請在活動前 7 天完成，否則名額會釋出。${payBtn}</div></div>`
+      : `<div class="callout go">🎉<div><b>已成團！</b>管理員會在 LINE 社群通知大家付款方式，請留意社群訊息。</div></div>`;
   } else if(mine){
-    callout = `<div class="callout info">✓<div><b>你已接龍，還差 ${ev.threshold-i.n} 人成團</b>成團後管理員會在 LINE 社群通知付款方式。</div></div>`;
+    callout = `<div class="callout info">✓<div><b>你已接龍，還差 ${ev.threshold-i.n} 人成團</b>${ev.booking ? '成團後這裡會出現「前往預約付款」按鈕。' : '成團後管理員會在 LINE 社群通知付款方式。'}</div></div>`;
   } else if(!i.reached && !i.ended){
-    callout = `<div class="callout info">💡<div><b>現在接龍不用付錢</b>滿 ${ev.threshold} 人才開班，成團後管理員會在 LINE 社群通知付款方式。</div></div>`;
+    callout = `<div class="callout info">💡<div><b>現在接龍不用付錢</b>滿 ${ev.threshold} 人才開班，成團後${ev.booking ? '再到預約系統完成付款' : '管理員會在 LINE 社群通知付款方式'}。請確認可以參加再接龍。</div></div>`;
   }
 
+  const optSelect = ev.options.length ? `<label class="field"><span>選擇方案</span>
+        <select class="input" id="jOption"><option value="">請選擇</option>${ev.options.map(o=>`<option>${esc(o)}</option>`).join('')}</select></label>` : '';
   const joinForm = (!mine && i.canJoin) ? `
     <div class="sec" id="joinSec">
-      <h4>+1 加入接龍</h4>
+      <h4>${i.isWait ? '加入候補' : '+1 加入接龍'}</h4>
       <div class="sub" style="margin-bottom:10px">會以「<b>${esc(myNick)}</b>」顯示在名單上</div>
-      <label class="check"><input type="checkbox" id="jAgree">我了解：接龍不等於完成報名，成團後需依管理員通知完成付款才算保留名額。</label>
+      ${optSelect}
+      <label class="field"><span>給管理員的備註 <em>（選填，只有管理員看得到）</em></span><input class="input" id="jNote" maxlength="100" placeholder="例如：會晚 10 分鐘到"></label>
+      <label class="check"><input type="checkbox" id="jAgree">我了解：接龍不等於完成報名，成團後需完成預約付款才算保留名額。</label>
       <div class="err" id="jErr"></div>
     </div>` : '';
 
   let cta;
-  if(mine) cta = `<div class="left"><b>✓ 已接龍</b>・${esc(myNick)}<br>需要取消請私訊管理員</div>`;
-  else if(i.canJoin) cta = `<div class="left"><b>${money(ev.price)}</b> ${esc(ev.priceNote)}<br>剩 ${i.left} 個名額</div><button class="btn" data-join="${ev.id}">+1 接龍</button>`;
+  if(mine) cta = waiting ? `<div class="left"><b>⏳ 候補中</b>・${esc(myNick)}<br>需要取消請私訊管理員</div>`
+                         : `<div class="left"><b>✓ 已接龍</b>・${esc(myNick)}<br>需要取消請私訊管理員</div>${i.reached && ev.booking ? `<a class="btn" href="${esc(ev.booking)}" target="_blank" rel="noopener">預約付款 ↗</a>` : ''}`;
+  else if(i.canJoin) cta = `<div class="left"><b>${money(ev.price)}</b> ${esc(ev.priceNote)}<br>${i.isWait ? `正取已滿・候補剩 ${ev.capacity + ev.waitMax - i.total} 位` : `剩 ${i.left} 個名額`}</div><button class="btn" data-join="${ev.id}">${i.isWait ? '加入候補' : '+1 接龍'}</button>`;
   else if(i.ended) cta = `<div class="left"><b>活動已結束</b></div>`;
   else cta = `<div class="left"><b>名額已滿</b><br>下次早點來 🙏</div><button class="btn" disabled>已額滿</button>`;
 
@@ -669,13 +872,16 @@ function openDetail(id){
         <dt>日期</dt><dd>${fmtDate(ev.date)} ${esc(ev.time)}</dd>
         <dt>地點</dt><dd>${esc(ev.place)}</dd>
         <dt>費用</dt><dd><b>${money(ev.price)}</b>${ev.priceNote?'・'+esc(ev.priceNote):''}</dd>
-        <dt>帶領</dt><dd>${esc(ev.host)}</dd>
+        <dt>${ev.cat==='member' ? '揪團人' : '帶領'}</dt><dd>${esc(ev.host)}</dd>
+        ${ev.options.length ? `<dt>方案</dt><dd>${ev.options.map(esc).join('<br>')}</dd>` : ''}
       </dl>
+      ${galleryHtml(ev)}
     </div>
     <div class="sec">
       <h4>接龍名單 <span class="count">${i.n} / ${ev.capacity}・${ev.threshold} 人成團</span><span class="spacer"></span><span class="badge ${i.cls}">${i.status}</span></h4>
       ${progress(ev,i)}
       <ul class="roster" style="margin-top:14px">${roster}</ul>
+      ${waitList}
     </div>
     ${callout ? `<div class="sec">${callout}</div>` : ''}
     ${ev.desc ? `<div class="sec"><h4>活動介紹</h4><div class="desc">${esc(ev.desc)}</div></div>` : ''}
@@ -686,20 +892,25 @@ function openDetail(id){
 
 async function join(id, btn){
   const err = $('#jErr');
+  const option = $('#jOption') ? $('#jOption').value : null;
+  if($('#jOption') && !option){ err.textContent='請選擇方案'; $('#joinSec').scrollIntoView({behavior:'smooth'}); return; }
   if(!$('#jAgree').checked){ err.textContent='請勾選確認說明'; $('#joinSec').scrollIntoView({behavior:'smooth'}); return; }
+  const note = $('#jNote') ? $('#jNote').value.trim() : '';
   const before = info(findEv(id)).reached;
+  const label = btn.textContent;
   btn.disabled = true; btn.textContent = '接龍中…';
   try{
-    const { result } = await api('join', { activityId:id });
+    const { result } = await api('join', { activityId:id, option, note });
     await Promise.all([loadData(), loadMe()]);
     const ev = findEv(id);
     if(result==='ok' || result==='reached') toast(result==='reached' || (!before && ev && info(ev).reached) ? '🎉 你是成團的關鍵一票！' : '接龍成功！');
-    else if(result==='full') toast('差一點！名額剛好被接滿了');
+    else if(result==='waitlist') toast('已加入候補，有空位時會依序遞補');
+    else if(result==='full') toast('差一點！名額和候補都滿了');
     else if(result==='already_joined') toast('你已經在名單上了');
     else toast('這個活動已經不開放了');
     render(); openDetail(id);
   }catch(e){
-    if(e.status!==401){ err.textContent = '接龍失敗，請稍後再試'; btn.disabled=false; btn.textContent='+1 接龍'; }
+    if(e.status!==401){ err.textContent = e.code==='bad_option' ? '請選擇方案' : '接龍失敗，請稍後再試'; btn.disabled=false; btn.textContent=label; }
   }
 }
 
@@ -742,14 +953,18 @@ function renderAdmin(){
   const pending = state.members.filter(m=>m.status==='pending').length;
   const badge = $('#pendingBadge');
   badge.textContent = pending; badge.classList.toggle('hidden', !pending);
+  const reviewN = state.events.filter(e=>e.status==='pending').length;
+  $('#reviewBadge').textContent = reviewN; $('#reviewBadge').classList.toggle('hidden', !reviewN);
   document.querySelectorAll('[data-nav]').forEach(b=>b.classList.toggle('on', b.dataset.nav===ui.atab));
-  const onMembers = ui.atab==='members';
-  $('#adminTitle').textContent = onMembers ? '人員清單' : '活動管理';
-  $('#membersPanel').classList.toggle('hidden', !onMembers);
-  $('#eventsPanel').classList.toggle('hidden', onMembers);
-  $('#newEvent').classList.toggle('hidden', onMembers);
-  $('#exportCsv').classList.toggle('hidden', !onMembers);
-  if(onMembers) renderMembers(); else renderEvents();
+  const tab = ui.atab;
+  $('#adminTitle').textContent = tab==='members' ? '人員清單' : tab==='content' ? '關於出走社' : '活動管理';
+  $('#membersPanel').classList.toggle('hidden', tab!=='members');
+  $('#contentPanel').classList.toggle('hidden', tab!=='content');
+  $('#eventsPanel').classList.toggle('hidden', tab!=='events');
+  $('#newEvent').classList.toggle('hidden', tab!=='events');
+  $('#exportCsv').classList.toggle('hidden', tab!=='members');
+  $('#exportXlsx').classList.toggle('hidden', tab!=='events');
+  if(tab==='members') renderMembers(); else if(tab==='content') renderContentEditor(); else renderEvents();
 }
 
 function renderMembers(){
@@ -788,21 +1003,172 @@ function exportCsv(){
   setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
 }
 
+function renderContentEditor(){
+  const ed = $('#aboutEditor');
+  if(state.about != null && !ed.dataset.loaded){ ed.value = state.about; ed.dataset.loaded = '1'; }
+  $('#aboutPreview').innerHTML = ed.value.trim() ? formatText(ed.value) : '<p class="sub">（還沒有內容）</p>';
+}
+async function saveAbout(btn){
+  btn.disabled = true;
+  try{
+    const body = $('#aboutEditor').value;
+    await api('admin_save_about', { body });
+    state.about = body;
+    $('#aboutSaved').textContent = `已儲存 ${fmtTime(new Date().toISOString())}`;
+    toast('已儲存，社員頁面立即看得到');
+  }catch(e){ if(e.status!==401) toast('儲存失敗：' + e.code); }
+  btn.disabled = false;
+}
+
+const REVIEW_LABEL = { pending:'待審核', rejected:'已退回' };
 function renderEvents(){
-  const rows = [...state.events].sort((a,b)=>a.date.localeCompare(b.date));
+  const n = (st)=>state.events.filter(e=>e.status===st).length;
+  const filters = [['open','上架中',n('open')],['pending','待審核',n('pending')],['rejected','已退回',n('rejected')]];
+  $('#eventFilters').innerHTML = filters.map(([k,label,c])=>`<button class="tab ${ui.efilter===k?'on':''}" data-efilter="${k}">${label} ${k==='pending' && c ? `<span class="count-badge">${c}</span>` : `<span class="n">${c}</span>`}</button>`).join('');
+  const rows = state.events.filter(e=>e.status===ui.efilter).sort((a,b)=>a.date.localeCompare(b.date));
+  const emptyText = { open:'還沒有活動，按右上角「新增活動」', pending:'目前沒有待審核的自揪申請 🎉', rejected:'沒有退回的申請' }[ui.efilter];
   $('#adminRows').innerHTML = rows.length ? rows.map(ev=>{
     const i=info(ev), c=CATS[ev.cat];
+    const review = ev.status !== 'open';
+    const who = ev.proposer ? `<div class="sub">申請人：${esc(ev.proposer)}${ev.submittedAt ? `・${fmtTime(ev.submittedAt)}` : ''}</div>` : '';
     return `<tr>
       <td>${fmtDate(ev.date)}<div class="sub">${esc(ev.time)}</div></td>
-      <td><div class="t">${esc(ev.title)}</div><div class="sub">${money(ev.price)}・${esc(ev.host)}</div></td>
+      <td><div class="t">${ev.images.length ? '🖼 ' : ''}${esc(ev.title)}</div><div class="sub">${money(ev.price)}・${esc(ev.host)}</div>${review ? who : ''}</td>
       <td><span class="chip" style="background:${c.color}">${c.name}</span></td>
-      <td style="min-width:150px">${progress(ev,i)}</td>
-      <td><span class="badge ${i.cls}">${i.status}</span></td>
-      <td><div class="actions">
-        <button class="btn ghost sm" data-roster="${ev.id}">名單</button>
-        <button class="btn ghost sm" data-edit="${ev.id}">編輯</button>
+      <td style="min-width:150px">${review ? `<div class="sub">名額 ${ev.capacity}・${ev.threshold} 人成團</div>` : progress(ev,i)}</td>
+      <td><span class="badge ${review ? (ev.status==='pending' ? 'review' : 'rejected') : i.cls}">${review ? REVIEW_LABEL[ev.status] : i.status}</span>${ev.status==='rejected' && ev.reviewNote ? `<div class="sub" style="margin-top:4px">${esc(ev.reviewNote)}</div>` : ''}</td>
+      <td><div class="actions">${review
+        ? `${ev.status==='pending' ? `<button class="btn sm" data-review="${ev.id}">審核</button>` : `<button class="btn ghost sm" data-review="${ev.id}">查看</button>`}
+           <button class="btn ghost sm" data-edit="${ev.id}">編輯</button>`
+        : `<button class="btn ghost sm" data-roster="${ev.id}">名單</button>
+           <button class="btn ghost sm" data-edit="${ev.id}">編輯</button>
+           <button class="btn ghost sm" data-copy="${ev.id}" title="用這場的內容建立新活動">複製</button>`}
       </div></td></tr>`;
-  }).join('') : `<tr><td colspan="6" class="sub" style="text-align:center;padding:30px">還沒有活動，按右上角「新增活動」</td></tr>`;
+  }).join('') : `<tr><td colspan="6" class="sub" style="text-align:center;padding:30px">${emptyText}</td></tr>`;
+}
+
+/* ---------- 社員自揪：審核（管理員） ---------- */
+function openReview(id){
+  const ev = findEv(id); if(!ev){ closeModal(); return; }
+  const c = CATS[ev.cat], pending = ev.status === 'pending';
+  openModal(`
+    <div class="sheet-head">
+      <span class="chip" style="background:${c.color}">${c.name}</span> <span class="badge ${pending ? 'review' : 'rejected'}">${REVIEW_LABEL[ev.status]}</span>
+      <h2>${esc(ev.title)}</h2>
+      <button class="close" data-close aria-label="關閉">×</button>
+      <dl class="info">
+        <dt>申請人</dt><dd>${esc(ev.proposer || '—')}${ev.proposerLine ? `<span class="sub">（LINE：${esc(ev.proposerLine)}）</span>` : ''}${ev.submittedAt ? `<div class="sub">送出：${fmtTime(ev.submittedAt)}</div>` : ''}</dd>
+        <dt>日期</dt><dd>${fmtDate(ev.date)} ${esc(ev.time)}</dd>
+        <dt>地點</dt><dd>${esc(ev.place)}</dd>
+        <dt>費用</dt><dd><b>${money(ev.price)}</b>${ev.priceNote?'・'+esc(ev.priceNote):''}</dd>
+        <dt>揪團人</dt><dd>${esc(ev.host)}</dd>
+        <dt>人數</dt><dd>名額 ${ev.capacity}・${ev.threshold} 人成團${ev.waitMax ? `・候補 ${ev.waitMax}` : ''}</dd>
+        ${ev.options.length ? `<dt>方案</dt><dd>${ev.options.map(esc).join('<br>')}</dd>` : ''}
+      </dl>
+      ${galleryHtml(ev)}
+    </div>
+    ${ev.desc ? `<div class="sec"><h4>活動介紹</h4><div class="desc">${esc(ev.desc)}</div></div>` : ''}
+    ${ev.status==='rejected' ? `<div class="sec"><div class="reject-note"><b>退回原因：</b>${esc(ev.reviewNote || '（未填寫）')}</div><div class="sub" style="margin-top:8px">申請人修改後會重新出現在「待審核」。</div></div>` : ''}
+    ${pending ? `<div class="sec">
+      <label class="field"><span>退回原因 <em>（退回時填寫，會用 LINE 通知申請人）</em></span>
+        <textarea class="input" id="rvNote" rows="2" maxlength="300" placeholder="例如：日期和社課撞期，請改到週日"></textarea></label>
+      <div class="hint" style="margin-top:0">需要調整內容（例如加上預約付款連結）可以先按「編輯」，存檔後再回來通過。</div>
+      <div class="err" id="rvErr"></div>
+    </div>` : ''}
+    <div class="sticky-cta">${pending
+      ? `<button class="btn danger" data-decide="${ev.id}|reject">退回</button><div class="left"></div><button class="btn ghost" data-edit="${ev.id}">編輯</button><button class="btn" data-decide="${ev.id}|approve">通過上架</button>`
+      : `<div class="left"></div><button class="btn ghost" data-edit="${ev.id}">編輯</button>`}</div>`);
+}
+async function decide(id, decision, btn){
+  const note = $('#rvNote') ? $('#rvNote').value.trim() : '';
+  if(decision==='reject' && !note){ $('#rvErr').textContent = '請填寫退回原因，讓申請人知道怎麼修改'; $('#rvNote').focus(); return; }
+  if(decision==='approve' && !confirm('通過後會立刻出現在社員的活動列表，並用 LINE 通知申請人。確定通過？')) return;
+  btn.disabled = true;
+  try{
+    await api('admin_review_activity', { id, decision, note });
+    await loadData(); closeModal(); render();
+    toast(decision==='approve' ? '已上架，並通知申請人' : '已退回，並通知申請人');
+  }catch(e){
+    btn.disabled = false;
+    if(e.status===401) return;
+    if(e.code==='not_pending'){ toast('這筆已經被其他管理員審核過了'); await loadData(); closeModal(); render(); }
+    else $('#rvErr').textContent = '操作失敗：' + e.code;
+  }
+}
+
+/* ---------- 社員自揪：我的申請 ---------- */
+function openMyProposals(){
+  const live = state.events.filter(e=>e.mineCreated && e.status==='open' && e.cat==='member');
+  const list = [...state.myProposals, ...live];
+  const item = (ev)=>{
+    const st = ev.status==='open' ? `<span class="badge go">已上架</span>` : ev.status==='pending' ? `<span class="badge review">審核中</span>` : `<span class="badge rejected">已退回</span>`;
+    const acts = ev.status==='open'
+      ? `<button class="btn ghost sm" data-open="${ev.id}">查看</button>`
+      : `<button class="btn ghost sm" data-propose="${ev.id}">${ev.status==='rejected' ? '修改後重新送出' : '修改'}</button><button class="btn danger sm" data-withdraw="${ev.id}">撤回</button>`;
+    return `<li><div class="row">${st}<span class="t">${esc(ev.title)}</span></div>
+      <div class="sub">${fmtDate(ev.date)} ${esc(ev.time)}・${money(ev.price)}・名額 ${ev.capacity}・${ev.threshold} 人成團</div>
+      ${ev.status==='rejected' && ev.reviewNote ? `<div class="reject-note"><b>管理員回覆：</b>${esc(ev.reviewNote)}</div>` : ''}
+      <div class="row">${acts}</div></li>`;
+  };
+  openModal(`<div class="sheet-head"><h2>我的自揪</h2><button class="close" data-close aria-label="關閉">×</button>
+      <div class="sub">送出的自揪活動要等管理員審核，通過後才會出現在活動列表。</div></div>
+    <div class="sec">${list.length ? `<ul class="prop-list">${list.map(item).join('')}</ul>` : '<div class="sub">還沒有自揪過活動。想揪大家一起做什麼嗎？</div>'}</div>
+    <div class="sticky-cta"><div class="left"></div><button class="btn" data-propose="" style="background:var(--c-member)">＋ 我要自揪</button></div>`);
+}
+async function withdrawProposal(id, btn){
+  if(!confirm('確定撤回這個自揪申請？撤回後會刪除，無法復原。')) return;
+  btn.disabled = true;
+  try{ await api('withdraw_proposal', { id }); await loadData(); render(); openMyProposals(); toast('已撤回'); }
+  catch(e){ btn.disabled = false; if(e.status!==401) toast('撤回失敗：' + e.code); }
+}
+
+/* ---------- 活動圖片上傳 ---------- */
+// 在手機上先縮成長邊 1600px 的 JPEG（通常 200～500KB），再經後端存到 Supabase Storage
+let formImages = [];   // 目前表單裡的圖片路徑
+let uploading = 0;
+function renderImgSlots(){
+  const box = $('#imgSlots'); if(!box) return;
+  box.innerHTML = formImages.map((p,k)=>`<div class="img-slot"><img src="${esc(imgUrl(p))}" alt="圖片 ${k+1}"><button type="button" class="rm" data-imgrm="${k}" aria-label="移除圖片">×</button></div>`).join('')
+    + Array.from({length:uploading},()=>`<div class="img-slot busy">上傳中…</div>`).join('')
+    + (formImages.length + uploading < 3 ? `<button type="button" class="img-add" data-imgadd><b>＋</b>加圖片</button>` : '');
+}
+function compressImage(file){
+  return new Promise((resolve, reject)=>{
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = ()=>{
+      URL.revokeObjectURL(url);
+      const sc = Math.min(1, 1000 / Math.max(img.naturalWidth, img.naturalHeight));
+      const w = Math.round(img.naturalWidth*sc), h = Math.round(img.naturalHeight*sc);
+      const c = document.createElement('canvas'); c.width = w; c.height = h;
+      const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0,0,w,h); g.drawImage(img,0,0,w,h);
+      const tryQ = (q)=>c.toBlob(b=>{
+        if(!b) return reject(new Error('encode'));
+        if(b.size > 1.8e6 && q > 0.4) return tryQ(q - 0.15);
+        resolve(b);
+      }, 'image/jpeg', q);
+      tryQ(0.82);
+    };
+    img.onerror = ()=>{ URL.revokeObjectURL(url); reject(new Error('decode')); };
+    img.src = url;
+  });
+}
+const blobToDataUrl = (b)=>new Promise((ok,no)=>{ const r = new FileReader(); r.onload = ()=>ok(r.result); r.onerror = no; r.readAsDataURL(b); });
+async function addImages(files){
+  const room = 3 - formImages.length - uploading;
+  const list = [...files].filter(f=>f.type.startsWith('image/') || /\.(heic|heif)$/i.test(f.name)).slice(0, Math.max(0, room));
+  if(files.length > list.length) toast('每個活動最多 3 張圖片');
+  for(const f of list){
+    uploading++; renderImgSlots();
+    try{
+      const blob = await compressImage(f);
+      const { path } = await api('upload_image', { data: await blobToDataUrl(blob) });
+      formImages.push(path);
+    }catch(e){
+      if(e.status!==401) toast(e.message==='decode' ? `「${f.name}」無法讀取，請換成 JPG 或 PNG` : e.code==='image_too_large' ? '圖片太大，請換一張' : '圖片上傳失敗，請稍後再試');
+    }
+    uploading--; renderImgSlots();
+  }
 }
 
 async function openRoster(id){
@@ -811,53 +1177,187 @@ async function openRoster(id){
   try{
     const { roster } = await api('admin_roster', { activityId:id });
     const i = info(ev);
+    const mainN = Math.min(roster.length, ev.capacity), waitN = roster.length - mainN;
+    const paidN = roster.slice(0, ev.capacity).filter(s=>s.paid).length;
+    const row = (s,k)=>{
+      const wait = k >= ev.capacity;
+      return `<li><span class="sub" style="min-width:44px">${wait ? `候補${k - ev.capacity + 1}` : k+1}</span>${av(s.nickname)}
+        <span style="flex:1;min-width:0">${esc(s.nickname)}${s.option ? `<span class="sub">（${esc(s.option)}）</span>` : ''}
+          <div class="meta">${s.line_name ? `LINE：${esc(s.line_name)}・` : ''}${fmtTime(s.created_at)}${s.note ? `<br><b>備註：</b>${esc(s.note)}` : ''}</div></span>
+        ${wait ? '' : `<label class="paid-toggle"><input type="checkbox" data-paid="${esc(s.id)}" ${s.paid ? 'checked' : ''}>已付款</label>`}
+        <button class="btn danger sm" data-rm="${id}|${esc(s.id)}" data-who="${esc(s.nickname)}">移除</button></li>`;
+    };
     openModal(`<div class="sheet-head"><h2>${esc(ev.title)}・名單</h2><button class="close" data-close aria-label="關閉">×</button>
-      <div class="sub">已接龍 ${roster.length}/${ev.capacity}・${ev.threshold} 人成團・${i.status}</div></div>
-      <div class="sec">${roster.length ? `<ul class="contact-list">${roster.map((s,k)=>`<li><span class="sub" style="width:20px">${k+1}</span>${av(s.nickname)}<span>${esc(s.nickname)}${s.line_name?`<div class="sub">LINE：${esc(s.line_name)}</div>`:''}</span><span class="c">${fmtTime(s.created_at)}</span><button class="btn danger sm" data-rm="${id}|${esc(s.id)}" data-who="${esc(s.nickname)}">移除</button></li>`).join('')}</ul>` : '<div class="sub">還沒有人接龍</div>'}</div>
-      <div class="sec"><div class="callout info">💡<div>社員無法自行取消接龍，有人私訊要取消時，從這裡移除。「LINE：」後面是對方的 LINE 名稱，只有管理員看得到。</div></div></div>`);
+      <div class="sub">${fmtDate(ev.date)} ${esc(ev.time)}・${i.status}</div>
+      <div class="sub">正取 ${mainN}/${ev.capacity}・${ev.threshold} 人成團${ev.waitMax ? `・候補 ${waitN}/${ev.waitMax}` : ''}・已付款 <span id="paidN">${paidN}</span>/${mainN}</div>
+      ${ev.booking ? `<div class="sub" style="margin-top:4px">預約付款連結：<a href="${esc(ev.booking)}" target="_blank" rel="noopener">${esc(ev.booking)}</a></div>` : ''}</div>
+      <div class="sec">${roster.length ? `<ul class="contact-list">${roster.map(row).join('')}</ul>` : '<div class="sub">還沒有人接龍</div>'}</div>
+      <div class="sec"><div class="callout info">💡<div>社員無法自行取消接龍，有人私訊要取消時，從這裡移除；正取有人移除時，候補會依序遞補。「LINE：」和備註只有管理員看得到。</div></div></div>`);
   }catch(e){
     if(e.status!==401) openModal(`<div class="sheet-head"><h2>名單</h2><button class="close" data-close aria-label="關閉">×</button></div><div class="sec err">載入失敗，請稍後再試</div>`);
   }
 }
 
-function openEdit(id){
-  const ev = id ? findEv(id) : { cat:'host', title:'', host:'', date:todayKey, time:'14:00', place:'出走社社辦', price:1000, priceNote:'', capacity:8, threshold:4, desc:'' };
+// propose＝社員自揪申請表單（類別固定「社員自揪」、不能設預約付款連結、不能一次建多場）
+function openEdit(id, copyFrom, propose){
+  const blank = propose
+    ? { cat:'member', title:'', host:state.me?.nickname||'', date:'', time:'', place:'', price:0, priceNote:'', capacity:6, threshold:2, desc:'', booking:'', options:[], waitMax:0, images:[] }
+    : { cat:'host', title:'', host:'', date:todayKey, time:'14:00', place:'出走社社辦', price:1000, priceNote:'', capacity:8, threshold:4, desc:'', booking:'', options:[], waitMax:0, images:[] };
+  const src = id ? findEv(id) : copyFrom ? findEv(copyFrom) : null;
+  const ev = src ? { ...src, date: id ? src.date : '' } : blank;
+  formImages = [...(ev.images||[])]; uploading = 0;
   const opt = Object.entries(CATS).map(([k,c])=>`<option value="${k}" ${ev.cat===k?'selected':''}>${c.name}</option>`).join('');
-  openModal(`<div class="sheet-head"><h2>${id?'編輯活動':'新增活動'}</h2><button class="close" data-close aria-label="關閉">×</button></div>
+  const title = propose ? (id ? '修改自揪申請' : '我要自揪 🙌') : id ? (ev.status!=='open' ? '編輯自揪申請' : '編輯活動') : copyFrom ? '複製活動' : '新增活動';
+  const intro = propose
+    ? `<div class="callout info" style="margin-top:8px">📝<div><b>送出後由管理員審核</b>通過後才會出現在活動列表，結果會用出走社官方帳號的 LINE 通知你（需先加好友）。</div></div>`
+    : copyFrom ? '<div class="sub">已帶入原活動的內容，請選擇新的日期</div>'
+    : (id && ev.status!=='open') ? `<div class="sub">這是社員「${esc(ev.proposer)}」的自揪申請，存檔後狀態不變，請回到「審核」通過或退回。</div>` : '';
+  openModal(`<div class="sheet-head"><h2>${title}</h2><button class="close" data-close aria-label="關閉">×</button>${intro}</div>
     <form class="sec" id="evForm" onsubmit="return false">
       <div class="form-grid">
-        <label class="field"><span>類別</span><select class="input" name="category">${opt}</select></label>
-        <label class="field"><span>帶領 / 揪團人</span><input class="input" name="host_name" value="${esc(ev.host)}"></label>
-        <label class="field full"><span>活動名稱</span><input class="input" name="title" value="${esc(ev.title)}"></label>
-        <label class="field"><span>日期</span><input class="input" type="date" name="event_date" value="${esc(ev.date)}"></label>
+        ${propose ? '' : `<label class="field"><span>類別</span><select class="input" name="category">${opt}</select></label>`}
+        <label class="field${propose ? ' full' : ''}"><span>${propose ? '揪團人（顯示名稱）' : '帶領 / 揪團人'}</span><input class="input" name="host_name" maxlength="40" value="${esc(ev.host)}"></label>
+        <label class="field full"><span>活動名稱</span><input class="input" name="title" maxlength="80" value="${esc(ev.title)}" ${propose ? 'placeholder="例如：週末陽明山健行"' : ''}></label>
+        <label class="field"><span>日期</span><input class="input" type="date" name="event_date" ${propose ? `min="${todayKey}"` : ''} value="${esc(ev.date)}"></label>
         <label class="field"><span>時間</span><input class="input" name="time_text" value="${esc(ev.time)}" placeholder="14:00–16:30"></label>
+        ${id || propose ? '' : `<div class="field full"><span>其他日期 <em>（同一份內容一次建立多場，選填）</em></span>
+          <div class="extra-dates" id="extraDates"><button type="button" class="btn ghost sm" data-adddate>＋ 加一個日期</button></div></div>`}
         <label class="field full"><span>地點</span><input class="input" name="place" value="${esc(ev.place)}"></label>
-        <label class="field"><span>價格（0 = 免費）</span><input class="input" type="number" min="0" step="50" name="price" value="${ev.price}"></label>
-        <label class="field"><span>價格說明</span><input class="input" name="price_note" value="${esc(ev.priceNote)}" placeholder="含材料 / 含服務費"></label>
+        <label class="field"><span>${propose ? '每人費用' : '價格'}（0 = 免費）</span><input class="input" type="number" min="0" step="10" name="price" value="${ev.price}"></label>
+        <label class="field"><span>價格說明</span><input class="input" name="price_note" value="${esc(ev.priceNote)}" placeholder="${propose ? 'AA 制 / 含門票' : '含材料 / 含服務費'}"></label>
         <label class="field"><span>名額上限</span><input class="input" type="number" min="1" name="capacity" value="${ev.capacity}"></label>
-        <label class="field"><span>開班門檻</span><input class="input" type="number" min="1" name="threshold" value="${ev.threshold}"></label>
-        <label class="field full"><span>活動介紹</span><textarea class="input" rows="4" name="description">${esc(ev.desc)}</textarea></label>
+        <label class="field"><span>開班門檻 <em>（幾人成團）</em></span><input class="input" type="number" min="1" name="threshold" value="${ev.threshold}"></label>
+        <label class="field"><span>候補人數 <em>（0＝不開放候補）</em></span><input class="input" type="number" min="0" max="20" name="wait_max" value="${ev.waitMax}"></label>
+        <label class="field full"><span>方案選項 <em>（一行一個，留空＝不用選）</em></span><textarea class="input" rows="2" name="options" placeholder="例如：&#10;小油畫體驗（$1,450）&#10;長期學習（$1,300）">${esc(ev.options.join('\n'))}</textarea></label>
+        ${propose ? '' : `<label class="field full"><span>預約付款連結 <em>（成團後顯示給接龍的人）</em></span><input class="input" name="booking_url" value="${esc(ev.booking)}" placeholder="https://agoodwayout.simplybook.asia/…"></label>`}
+        <label class="field full"><span>活動介紹</span><textarea class="input" rows="6" name="description" placeholder="${propose ? '活動內容、集合方式、要帶什麼、怎麼付款…' : ''}">${esc(ev.desc)}</textarea></label>
+        <div class="field full"><span>活動圖片 <em>（最多 3 張，第一張當封面；會自動縮小）</em></span>
+          <div class="img-slots" id="imgSlots"></div>
+          <input type="file" id="imgFile" accept="image/*" multiple class="hidden"></div>
       </div>
       <div class="err" id="fErr"></div>
     </form>
-    <div class="sticky-cta">${id?`<button class="btn danger" data-del="${id}">刪除</button>`:''}<div class="left"></div><button class="btn" data-save="${id||''}">儲存</button></div>`);
+    <div class="sticky-cta">${id && !propose ? `<button class="btn danger" data-del="${id}">刪除</button>` : ''}<div class="left"></div>${propose
+      ? `<button class="btn" data-sendprop="${id||''}" style="background:var(--c-member)">${id ? '儲存並送審' : '送出申請'}</button>`
+      : `<button class="btn" data-save="${id||''}">儲存</button>`}</div>`);
+  renderImgSlots();
+  $('#imgFile').onchange = (e)=>{ addImages(e.target.files); e.target.value = ''; };
+}
+
+// 讀表單 → 檢查 → 回傳活動內容（有錯回傳 null 並顯示）
+function readEventForm(propose){
+  const fd = new FormData($('#evForm'));
+  const a = Object.fromEntries(fd.entries());
+  const dates = fd.getAll('extra_date').filter(Boolean);
+  delete a.extra_date;
+  ['price','capacity','threshold','wait_max'].forEach(k=>a[k]=Number(a[k]));
+  a.images = [...formImages];
+  const err = $('#fErr');
+  const bad = (m)=>{ err.textContent = m; err.scrollIntoView({behavior:'smooth', block:'center'}); return null; };
+  if(uploading) return bad('圖片還在上傳中，請稍候');
+  if(!a.title.trim() || !a.host_name.trim() || !a.event_date) return bad(`請填寫名稱、${propose ? '揪團人' : '帶領人'}與日期`);
+  if(propose && a.event_date < todayKey) return bad('日期已經過了，請選今天以後');
+  if(!(a.price>=0)) return bad('價格請填 0 以上');
+  if(!(a.capacity>=1) || !(a.threshold>=1)) return bad('名額與門檻至少要 1');
+  if(a.threshold > a.capacity) return bad('開班門檻不能大於名額上限');
+  if(!(a.wait_max>=0 && a.wait_max<=20)) return bad('候補人數請填 0～20');
+  if(a.booking_url && !/^https?:\/\//.test(a.booking_url.trim())) return bad('預約付款連結要以 https:// 開頭');
+  return { a, dates };
 }
 
 async function saveEvent(id, btn){
-  const a = Object.fromEntries(new FormData($('#evForm')).entries());
-  ['price','capacity','threshold'].forEach(k=>a[k]=Number(a[k]));
-  const err = $('#fErr');
-  if(!a.title.trim() || !a.host_name.trim() || !a.event_date){ err.textContent='請填寫名稱、帶領人與日期'; return; }
-  if(!(a.capacity>=1) || !(a.threshold>=1)){ err.textContent='名額與門檻至少要 1'; return; }
-  if(a.threshold > a.capacity){ err.textContent='開班門檻不能大於名額上限'; return; }
+  const f = readEventForm(false); if(!f) return;
   btn.disabled = true;
   try{
-    await api('admin_save_activity', { id: id || null, activity: a });
-    await loadData(); closeModal(); render();
-    toast(id ? '已更新活動' : '已新增活動，社員頁面立即看得到');
+    const r = await api('admin_save_activity', { id: id || null, activity: f.a, dates: f.dates });
+    await loadData();
+    const ev = id && findEv(id);
+    if(ev && ev.status==='pending'){ render(); openReview(id); toast('已更新，請繼續審核'); return; }
+    closeModal(); render();
+    toast(id ? '已更新活動' : r.created > 1 ? `已新增 ${r.created} 場活動` : '已新增活動，社員頁面立即看得到');
   }catch(e){
     btn.disabled = false;
-    if(e.status!==401) err.textContent = '儲存失敗：' + e.code;
+    if(e.status!==401) $('#fErr').textContent = '儲存失敗：' + e.code;
+  }
+}
+
+async function sendProposal(id, btn){
+  const f = readEventForm(true); if(!f) return;
+  btn.disabled = true;
+  try{
+    await api('propose_activity', { id: id || null, activity: f.a });
+    await loadData(); render(); openMyProposals();
+    toast('已送出，管理員審核後會用 LINE 通知你');
+  }catch(e){
+    btn.disabled = false;
+    if(e.status===401) return;
+    $('#fErr').textContent = e.code==='too_many_pending' ? '你已經有 5 個申請在審核中，請等審核完再送'
+      : e.code==='date_passed' ? '日期已經過了，請選今天以後'
+      : e.code==='not_found' ? '這個申請已經審核過或被撤回了'
+      : '送出失敗：' + e.code;
+  }
+}
+
+/* ---------- 下載 Excel（活動總表＋接龍名單） ---------- */
+function openExport(){
+  const up = state.events.filter(e=>e.status==='open' && e.date >= todayKey).length;
+  const all = state.events.filter(e=>e.status==='open').length;
+  openModal(`<div class="sheet-head"><h2>下載 Excel</h2><button class="close" data-close aria-label="關閉">×</button>
+      <div class="sub">檔案有兩個分頁：「活動總表」一場一列，「接龍名單」一人一列（含 LINE 名稱、方案、備註、已付款）。</div></div>
+    <div class="sec">
+      <div class="field"><span>範圍</span>
+        <div class="seg">
+          <label><input type="radio" name="xr" value="up" checked><span>即將舉行（${up} 場）</span></label>
+          <label><input type="radio" name="xr" value="all"><span>全部（${all} 場，含已結束）</span></label>
+        </div>
+        <div class="hint">「全部」是網站目前保留的範圍：近 180 天起的活動。待審核、已退回的自揪申請不會匯出。</div>
+      </div>
+      <div class="callout warn">⚠️<div>檔案裡有社員的 LINE 名稱和備註，請只在自己的電腦使用、不要轉傳。在 LINE 裡開網頁可能無法下載，請改用電腦或手機瀏覽器。</div></div>
+      <div class="err" id="xErr"></div>
+    </div>
+    <div class="sticky-cta"><div class="left"></div><button class="btn" data-doexport>⬇ 下載</button></div>`);
+}
+function loadScript(src){
+  return new Promise((ok,no)=>{ const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = ()=>no(new Error('script')); document.head.appendChild(s); });
+}
+async function doExport(btn){
+  const range = document.querySelector('input[name="xr"]:checked').value;
+  const evs = state.events.filter(e=>e.status==='open' && (range==='all' || e.date >= todayKey)).sort((a,b)=>a.date.localeCompare(b.date) || a.title.localeCompare(b.title));
+  if(!evs.length){ $('#xErr').textContent = '這個範圍沒有活動'; return; }
+  btn.disabled = true; btn.textContent = '準備中…';
+  try{
+    if(!window.XLSX) await loadScript(CONFIG.xlsxLib);
+    const { signups } = await api('admin_export', { activityIds: evs.map(e=>e.id) });
+    const by = {};
+    signups.forEach(s=>{ (by[s.activity_id] ||= []).push(s); });
+    const wk = (d)=>WEEK[parseD(d).getDay()];
+    const sheet1 = [['日期','星期','時間','類別','活動名稱','帶領 / 揪團人','地點','費用','價格說明','名額','開班門檻','候補上限','正取人數','候補人數','已付款','狀態','方案','預約付款連結']];
+    const sheet2 = [['日期','活動名稱','順序','正取 / 候補','暱稱','LINE 名稱','方案','給管理員的備註','已付款','接龍時間']];
+    evs.forEach(ev=>{
+      const rs = by[ev.id] || [], i = info(ev);
+      const main = rs.slice(0, ev.capacity), wait = rs.slice(ev.capacity);
+      sheet1.push([ev.date, wk(ev.date), ev.time, CATS[ev.cat].name, ev.title, ev.host, ev.place, ev.price, ev.priceNote, ev.capacity, ev.threshold, ev.waitMax,
+        main.length, wait.length, main.filter(s=>s.paid).length, i.status, ev.options.join(' / '), ev.booking]);
+      rs.forEach((s,k)=>{
+        const w = k >= ev.capacity;
+        sheet2.push([ev.date, ev.title, w ? k - ev.capacity + 1 : k + 1, w ? '候補' : '正取', s.nickname||'', s.line_name||'', s.option||'', s.note||'', w ? '' : (s.paid ? '是' : '否'), new Date(s.created_at).toLocaleString('zh-TW', { hour12:false })]);
+      });
+    });
+    const wb = XLSX.utils.book_new();
+    const add = (rows, name, widths)=>{
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+      ws['!cols'] = widths.map(w=>({ wch:w }));
+      ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s:{r:0,c:0}, e:{r:rows.length-1, c:rows[0].length-1} }) };
+      ws['!freeze'] = { xSplit:0, ySplit:1 };
+      XLSX.utils.book_append_sheet(wb, ws, name);
+    };
+    add(sheet1, '活動總表', [11,5,12,10,28,14,18,8,14,6,8,8,8,8,7,18,24,30]);
+    add(sheet2, '接龍名單', [11,28,6,10,12,16,20,24,7,18]);
+    XLSX.writeFile(wb, `agoodwayout_activities_${todayKey}.xlsx`);   // 英文檔名：部分瀏覽器不支援中文下載檔名
+    closeModal(); toast(`已下載 ${evs.length} 場活動、${signups.length} 筆接龍`);
+  }catch(e){
+    btn.disabled = false; btn.textContent = '⬇ 下載';
+    if(e.status!==401) $('#xErr').textContent = e.message==='script' ? 'Excel 元件載入失敗，請檢查網路後再試' : '下載失敗：' + (e.code || e.message);
   }
 }
 
@@ -879,13 +1379,36 @@ function closeModal(force){
 
 /* ---------- 事件 ---------- */
 document.addEventListener('click', async e=>{
-  const t = e.target.closest('[data-view],[data-mfilter],[data-mset],[data-madmin],[data-recheck],[data-day],[data-dayclear],[data-mode],[data-cat],[data-open],[data-close],[data-overlay],[data-join],[data-roster],[data-rm],[data-edit],[data-save],[data-del],[data-editnick],[data-savenick]');
+  const t = e.target.closest('[data-efilter],[data-review],[data-decide],[data-propose],[data-withdraw],[data-sendprop],[data-imgadd],[data-imgrm],[data-doexport],[data-paid],[data-copy],[data-adddate],[data-view],[data-mfilter],[data-mset],[data-madmin],[data-recheck],[data-day],[data-dayclear],[data-mode],[data-cat],[data-open],[data-close],[data-overlay],[data-join],[data-roster],[data-rm],[data-edit],[data-save],[data-del],[data-editnick],[data-savenick]');
   if(!t) return;
   const d = t.dataset;
   if(d.overlay!==undefined && e.target!==t) return;
   if(d.mode){
     if(d.mode==='admin') location.hash = ui.atab || 'events';          // 觸發 hashchange → applyRoute
     else { history.pushState(null, '', location.pathname + location.search); applyRoute(); }
+  }
+  else if(d.efilter){ ui.efilter = d.efilter; renderEvents(); }
+  else if(d.review) openReview(d.review);
+  else if(d.decide){ const [id, dec] = d.decide.split('|'); decide(id, dec, t); }
+  else if(d.propose!==undefined) openEdit(d.propose || null, null, true);
+  else if(d.withdraw) withdrawProposal(d.withdraw, t);
+  else if(d.sendprop!==undefined) sendProposal(d.sendprop, t);
+  else if(d.imgadd!==undefined) $('#imgFile').click();
+  else if(d.imgrm!==undefined){ formImages.splice(Number(d.imgrm), 1); renderImgSlots(); }
+  else if(d.doexport!==undefined) doExport(t);
+  else if(d.paid){
+    const checked = t.checked;
+    t.disabled = true;
+    try{ await api('admin_set_paid', { signupId:d.paid, paid:checked }); toast(checked ? '已標記為已付款' : '已取消付款標記');
+      const pn = $('#paidN'); if(pn) pn.textContent = document.querySelectorAll('[data-paid]:checked').length; }
+    catch(err){ t.checked = !checked; if(err.status!==401) toast('更新失敗，請稍後再試'); }
+    t.disabled = false;
+  }
+  else if(d.copy) openEdit(null, d.copy);
+  else if(d.adddate!==undefined){
+    const inp = document.createElement('input');
+    inp.type = 'date'; inp.name = 'extra_date'; inp.className = 'input';
+    t.before(inp); inp.focus();
   }
   else if(d.view){ prefs.view = d.view; savePrefs(); renderMember(); }
   else if(d.mfilter){ ui.mfilter=d.mfilter; renderMembers(); }
@@ -934,10 +1457,15 @@ document.addEventListener('click', async e=>{
 document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeModal(); });
 
 $('#hideHowto').onclick = ()=>{ prefs.hideHowto=true; savePrefs(); renderMember(); };
-$('#prevM').onclick = ()=>{ let [y,m]=ui.ym; m--; if(m<0){m=11;y--;} ui.ym=[y,m]; ui.day=null; renderMember(); };
-$('#nextM').onclick = ()=>{ let [y,m]=ui.ym; m++; if(m>11){m=0;y++;} ui.ym=[y,m]; ui.day=null; renderMember(); };
+$('#prevM').onclick = ()=>{ let [y,m]=ui.ym; m--; if(m<0){m=11;y--;} ui.ym=[y,m]; ui.day=null; renderMember(); scrollToMonth(); };
+$('#nextM').onclick = ()=>{ let [y,m]=ui.ym; m++; if(m>11){m=0;y++;} ui.ym=[y,m]; ui.day=null; renderMember(); scrollToMonth(); };
 $('#newEvent').onclick = ()=>openEdit(null);
 $('#exportCsv').onclick = exportCsv;
+$('#exportXlsx').onclick = openExport;
+$('#newProposal').onclick = ()=>openEdit(null, null, true);
+$('#myProps').onclick = openMyProposals;
+$('#saveAbout').onclick = (e)=>saveAbout(e.currentTarget);
+$('#aboutEditor').addEventListener('input', ()=>{ $('#aboutPreview').innerHTML = formatText($('#aboutEditor').value); $('#aboutSaved').textContent = '尚未儲存'; });
 
 // 每 30 秒更新一次名單，讓大家看到最新人潮（有視窗開著或頁面在背景時跳過）
 // 審核中的人：每 30 秒檢查是否已通過，通過就自動進入
@@ -973,6 +1501,31 @@ async function boot(){
   render();
   if(ui.mode === 'admin'){ try{ await loadMembers(); render(); }catch(e){} }
   if(!state.me) openNickname(true);
+  else if(isApproved()) openFromLink();
+}
+
+// LINE 通知裡的連結：?ev=活動 ID（打開活動）、?page=review（管理員審核）、?page=proposals（我的自揪）
+function openFromLink(){
+  const q = new URLSearchParams(location.search);
+  const ev = q.get('ev'), page = q.get('page');
+  if(!ev && !page) return;
+  q.delete('ev'); q.delete('page');
+  history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : '') + location.hash);   // 重新整理時不會再跳一次
+  const admin = !!state.me?.is_admin;
+  const toReview = (filter)=>{   // 直接切到後台「活動管理」（不經過 hashchange，避免把接著打開的視窗關掉）
+    ui.mode = 'admin'; ui.atab = 'events'; ui.efilter = filter;
+    history.replaceState(null, '', location.pathname + location.search + '#events');
+    render(); loadMembers().then(render).catch(()=>{});
+  };
+  if(page==='review' && admin) toReview('pending');
+  else if(page==='proposals') openMyProposals();
+  else if(ev){
+    const e = findEv(ev);
+    if(!e) toast('找不到這個活動，可能已經刪除了');
+    else if(e.status==='open') openDetail(ev);
+    else if(admin){ toReview(e.status); openReview(ev); }
+    else openMyProposals();
+  }
 }
 boot();
 </script>
@@ -998,6 +1551,51 @@ boot();
     if(ROLE === 'admin' && isApproved()) await loadMembers();
     if(!document.getElementById('modalRoot').innerHTML) render();
   }
+
+  // ---------- 模擬 LINE 通知收件匣 ----------
+  const SEEN = 'gwo-demo-seen-' + ROLE;
+  const LIFF = 'https://liff.line.me/2012620335-Hk2HkkYY';
+  let seen = 0, lastMine = null, tab = 'mine';
+  try{ seen = Number(localStorage.getItem(SEEN) || 0); }catch(e){}
+  // 訊息裡的網站連結改成打開這個體驗頁（正式網站會打開 LINE 裡的接龍網站）
+  function msgHtml(text, mine){
+    return esc(text).replace(/(https?:\/\/[^\s<]+)/g, (u)=>{
+      if(u.startsWith(LIFF)) return mine ? `<a href="./${u.slice(LIFF.length)}">👉 打開網站</a>` : '<span class="sub">（網站連結）</span>';
+      return `<a href="${u}" target="_blank" rel="noopener">${u}</a>`;
+    });
+  }
+  function inboxHtml(){
+    const { mine, all } = DemoBackend.notices();
+    const list = tab === 'mine' ? mine : all;
+    const body = list.length ? list.map(n=>`<div class="ln-msg"><div class="ln-av">出</div><div>
+        <div class="ln-meta">出走社官方帳號 → <b>${esc(n.toName)}</b>${n.mine ? '（你）' : ''}・${fmtTime(n.at)}${n.mine && Date.parse(n.at) > seen ? '<span class="ln-new">新</span>' : ''}</div>
+        <div class="ln-bubble">${msgHtml(n.text, n.mine)}</div></div></div>`).join('')
+      : `<div class="ln-empty">${tab === 'mine' ? '你還沒有收到通知' : '還沒有任何人收到通知'}</div>`;
+    return `<div class="sheet-head ln-head"><h2>📩 LINE 通知（模擬）</h2><button class="close" data-close aria-label="關閉">×</button>
+        <div class="sub">正式網站會由出走社官方帳號傳到 LINE（要先加好友才收得到）。</div>
+        <div class="ln-tabs"><button data-lntab="mine" class="${tab==='mine'?'on':''}">寄給我（${mine.length}）</button><button data-lntab="all" class="${tab==='all'?'on':''}">所有人收到的（${all.length}）</button></div></div>
+      <div class="ln-body">${body}</div>`;
+  }
+  function openInbox(){
+    openModal(inboxHtml());
+    seen = Date.now(); try{ localStorage.setItem(SEEN, String(seen)); }catch(e){}
+    checkInbox(true);
+  }
+  function checkInbox(silent){
+    const { mine } = DemoBackend.notices();
+    const unread = mine.filter(n=>Date.parse(n.at) > seen).length;
+    const b = document.getElementById('demoInboxN');
+    b.textContent = unread; b.classList.toggle('hidden', !unread);
+    if(lastMine !== null && mine.length > lastMine && !silent) toast('📩 你收到一則 LINE 通知（模擬），點上方「LINE 通知」查看');
+    lastMine = mine.length;
+  }
+  document.getElementById('demoInbox').onclick = openInbox;
+  document.addEventListener('click', e=>{
+    const t = e.target.closest('[data-lntab]'); if(!t) return;
+    tab = t.dataset.lntab; openModal(inboxHtml());
+  });
+  checkInbox(true);
+  setInterval(()=>checkInbox(false), 1500);
 
   // 另一個頁面改了資料 → 這個頁面跟著更新
   window.addEventListener('storage', async e=>{

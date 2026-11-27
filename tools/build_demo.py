@@ -22,6 +22,23 @@ DEMO_CSS = """
   .demo-banner b{font-size:14px;color:#18364b}
   .demo-link{color:#2f6f7e;font-weight:700;text-decoration:none;border:1.5px solid #9ec5ce;background:#fff;border-radius:999px;padding:3px 10px}
   .demo-btn{border:1.5px solid #e0c58e;background:#fff;color:#6e4c12;border-radius:999px;padding:3px 10px;font-size:13px;font-weight:700}
+  .demo-inbox{border-color:#06c755;color:#058a3c;display:inline-flex;align-items:center;gap:4px}
+  .demo-inbox .count-badge{background:#06c755}
+  /* 模擬 LINE 通知收件匣 */
+  .ln-head{background:#06c755;color:#fff}
+  .ln-head h2{color:#fff}
+  .ln-head .sub{color:rgba(255,255,255,.9)}
+  .ln-tabs{display:flex;gap:6px;margin-top:10px}
+  .ln-tabs button{border:0;border-radius:999px;padding:5px 12px;font-size:13px;background:rgba(255,255,255,.25);color:#fff}
+  .ln-tabs button.on{background:#fff;color:#058a3c;font-weight:700}
+  .ln-body{background:#8ca6c4;padding:16px 14px;min-height:240px}
+  .ln-msg{display:flex;gap:8px;align-items:flex-start;margin-bottom:14px}
+  .ln-av{width:34px;height:34px;border-radius:50%;background:#18364b;color:#fff;display:grid;place-items:center;font-weight:700;flex:none;font-size:14px}
+  .ln-meta{font-size:12px;color:#fff;margin-bottom:3px}
+  .ln-bubble{background:#fff;border-radius:4px 16px 16px 16px;padding:10px 12px;font-size:14px;line-height:1.55;color:#18364b;white-space:pre-line;word-break:break-word;max-width:420px}
+  .ln-bubble a{color:#2a6ad6}
+  .ln-new{display:inline-block;background:#e5483a;color:#fff;font-size:11px;border-radius:999px;padding:0 6px;margin-left:4px}
+  .ln-empty{color:#fff;text-align:center;padding:40px 0;font-size:14px}
 """
 
 def banner(role):
@@ -34,11 +51,12 @@ def banner(role):
   <span>假資料只存在這台電腦，不會影響正式網站</span>
   <span class="spacer"></span>
   {link}
+  <button class="demo-btn demo-inbox" id="demoInbox" title="正式網站會用出走社官方帳號傳 LINE 訊息；體驗模式改放在這裡">📩 LINE 通知<span class="count-badge hidden" id="demoInboxN"></span></button>
   <button class="demo-btn" id="demoReset">重來一次</button>
 </div>
 """
 
-DEMO_SCRIPT = """<script>
+DEMO_SCRIPT = r"""<script>
 /* ---------- 體驗模式：兩頁同步、重來一次 ---------- */
 (function(){
   const ROLE = DemoBackend.ROLE, KEY = DemoBackend.KEY;
@@ -61,6 +79,51 @@ DEMO_SCRIPT = """<script>
     if(!document.getElementById('modalRoot').innerHTML) render();
   }
 
+  // ---------- 模擬 LINE 通知收件匣 ----------
+  const SEEN = 'gwo-demo-seen-' + ROLE;
+  const LIFF = 'https://liff.line.me/2012620335-Hk2HkkYY';
+  let seen = 0, lastMine = null, tab = 'mine';
+  try{ seen = Number(localStorage.getItem(SEEN) || 0); }catch(e){}
+  // 訊息裡的網站連結改成打開這個體驗頁（正式網站會打開 LINE 裡的接龍網站）
+  function msgHtml(text, mine){
+    return esc(text).replace(/(https?:\/\/[^\s<]+)/g, (u)=>{
+      if(u.startsWith(LIFF)) return mine ? `<a href="./${u.slice(LIFF.length)}">👉 打開網站</a>` : '<span class="sub">（網站連結）</span>';
+      return `<a href="${u}" target="_blank" rel="noopener">${u}</a>`;
+    });
+  }
+  function inboxHtml(){
+    const { mine, all } = DemoBackend.notices();
+    const list = tab === 'mine' ? mine : all;
+    const body = list.length ? list.map(n=>`<div class="ln-msg"><div class="ln-av">出</div><div>
+        <div class="ln-meta">出走社官方帳號 → <b>${esc(n.toName)}</b>${n.mine ? '（你）' : ''}・${fmtTime(n.at)}${n.mine && Date.parse(n.at) > seen ? '<span class="ln-new">新</span>' : ''}</div>
+        <div class="ln-bubble">${msgHtml(n.text, n.mine)}</div></div></div>`).join('')
+      : `<div class="ln-empty">${tab === 'mine' ? '你還沒有收到通知' : '還沒有任何人收到通知'}</div>`;
+    return `<div class="sheet-head ln-head"><h2>📩 LINE 通知（模擬）</h2><button class="close" data-close aria-label="關閉">×</button>
+        <div class="sub">正式網站會由出走社官方帳號傳到 LINE（要先加好友才收得到）。</div>
+        <div class="ln-tabs"><button data-lntab="mine" class="${tab==='mine'?'on':''}">寄給我（${mine.length}）</button><button data-lntab="all" class="${tab==='all'?'on':''}">所有人收到的（${all.length}）</button></div></div>
+      <div class="ln-body">${body}</div>`;
+  }
+  function openInbox(){
+    openModal(inboxHtml());
+    seen = Date.now(); try{ localStorage.setItem(SEEN, String(seen)); }catch(e){}
+    checkInbox(true);
+  }
+  function checkInbox(silent){
+    const { mine } = DemoBackend.notices();
+    const unread = mine.filter(n=>Date.parse(n.at) > seen).length;
+    const b = document.getElementById('demoInboxN');
+    b.textContent = unread; b.classList.toggle('hidden', !unread);
+    if(lastMine !== null && mine.length > lastMine && !silent) toast('📩 你收到一則 LINE 通知（模擬），點上方「LINE 通知」查看');
+    lastMine = mine.length;
+  }
+  document.getElementById('demoInbox').onclick = openInbox;
+  document.addEventListener('click', e=>{
+    const t = e.target.closest('[data-lntab]'); if(!t) return;
+    tab = t.dataset.lntab; openModal(inboxHtml());
+  });
+  checkInbox(true);
+  setInterval(()=>checkInbox(false), 1500);
+
   // 另一個頁面改了資料 → 這個頁面跟著更新
   window.addEventListener('storage', async e=>{
     if(e.key !== KEY) return;
@@ -75,6 +138,13 @@ def build(role):
     s = SRC
     assert s.count(LIFF_TAG) == 1
     s = s.replace(LIFF_TAG, f"<script>window.DEMO_ROLE = '{role}';</script>\n<script src=\"../demo-backend.js\"></script>")
+    # 圖片存在瀏覽器裡，不是 Supabase Storage；縮小一點，瀏覽器空間才放得下十幾張
+    img = "const imgUrl = (path)=>`${CONFIG.supabaseUrl}/storage/v1/object/public/${CONFIG.imageBucket}/${path}`;"
+    assert s.count(img) == 1
+    s = s.replace(img, "const imgUrl = (path)=>DemoBackend.imgUrl(path);")
+    shrink = "Math.min(1, 1600 / Math.max("
+    assert s.count(shrink) == 1
+    s = s.replace(shrink, "Math.min(1, 1000 / Math.max(")
     title = "出走社活動接龍（體驗・社員）" if role == "member" else "出走社管理員後台（體驗）"
     assert s.count("<title>出走社活動接龍</title>") == 1
     s = s.replace("<title>出走社活動接龍</title>", f"<title>{title}</title>")
