@@ -477,7 +477,7 @@
     <nav class="tabs" id="memberFilters" style="position:static;padding-top:0"></nav>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>暱稱</th><th>LINE 名稱</th><th>狀態</th><th>加入日期</th><th>接龍中</th><th>操作</th></tr></thead>
+        <thead><tr><th>社群暱稱</th><th>LINE 名稱</th><th>狀態</th><th>加入日期</th><th>接龍中</th><th>操作</th></tr></thead>
         <tbody id="memberRows"></tbody>
       </table>
     </div>
@@ -991,7 +991,7 @@ function renderMembers(){
 }
 
 function exportCsv(){
-  const head = ['暱稱','LINE 名稱','狀態','管理員','加入時間','接龍中場數'];
+  const head = ['社群暱稱','LINE 名稱','狀態','管理員','加入時間','接龍中場數'];
   const rows = state.members.map(m=>[m.nickname, m.line_name||'', STATUS_LABEL[m.status], m.is_admin?'是':'', new Date(m.created_at).toLocaleString('zh-TW'), m.active_signups]);
   const csv = [head, ...rows].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\r\n');
   const blob = new Blob(['\ufeff' + csv], { type:'text/csv;charset=utf-8' });
@@ -1331,7 +1331,7 @@ async function doExport(btn){
     signups.forEach(s=>{ (by[s.activity_id] ||= []).push(s); });
     const wk = (d)=>WEEK[parseD(d).getDay()];
     const sheet1 = [['日期','星期','時間','類別','活動名稱','帶領 / 揪團人','地點','費用','價格說明','名額','開班門檻','候補上限','正取人數','候補人數','已付款','狀態','方案','預約付款連結']];
-    const sheet2 = [['日期','活動名稱','順序','正取 / 候補','暱稱','LINE 名稱','方案','給管理員的備註','已付款','接龍時間']];
+    const sheet2 = [['日期','活動名稱','順序','正取 / 候補','社群暱稱','LINE 名稱','方案','給管理員的備註','已付款','接龍時間']];
     evs.forEach(ev=>{
       const rs = by[ev.id] || [], i = info(ev);
       const main = rs.slice(0, ev.capacity), wait = rs.slice(ev.capacity);
