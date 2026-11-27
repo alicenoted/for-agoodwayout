@@ -431,7 +431,7 @@
     <h1 id="adminTitle">活動管理</h1>
     <button class="btn sm" id="newEvent">＋ 新增活動</button>
     <button class="btn ghost sm" id="exportXlsx">⬇ 下載 Excel</button>
-    <button class="btn ghost sm hidden" id="exportCsv">⬇ 匯出試算表（CSV）</button>
+    <button class="btn ghost sm hidden" id="exportMembers">⬇ 下載 Excel</button>
   </div>
   <section id="contentPanel" class="hidden">
     <div class="callout info" style="margin-bottom:12px">✏️<div>這裡的內容會顯示在社員頁的「關於出走社」，只有通過審核的社員看得到。<br>格式：<b>## </b>開頭＝標題、<b>- </b>開頭＝項目、空一行＝分段、網址會自動變成連結。</div></div>
@@ -508,6 +508,30 @@ function fmtTime(iso){ const d=new Date(iso); return `${d.getMonth()+1}/${d.getD
 function avColor(nick){ let h=0; for(const c of nick) h=(h*31+c.charCodeAt(0))>>>0; return AV_COLORS[h%AV_COLORS.length]; }
 function av(nick){ return `<span class="av" style="background:${avColor(nick)}" title="${esc(nick)}">${esc([...nick][0]||'?')}</span>`; }
 function toast(msg){ document.querySelectorAll('.toast').forEach(x=>x.remove()); const t=document.createElement('div'); t.className='toast'; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),2800); }
+
+/* ---------- 外部瀏覽器 ---------- */
+// 在 LINE 裡打開時，付款頁、外部網站、下載檔案改用手機預設瀏覽器（Safari／Chrome）開。
+// 一般瀏覽器裡照常開新分頁。
+const inLine = ()=>{ try{ return !!window.liff && liff.isInClient(); }catch(e){ return false; } };
+function openExternal(url){
+  if(inLine()){ try{ liff.openWindow({ url, external:true }); return; }catch(e){} }
+  window.open(url, '_blank', 'noopener');
+}
+document.addEventListener('click', e=>{
+  const a = e.target.closest('a[data-ext]');
+  if(!a || !inLine()) return;
+  e.preventDefault(); e.stopPropagation();
+  openExternal(a.href);
+}, true);
+// LINE 內建瀏覽器多半不能下載檔案：改請管理員用外部瀏覽器打開後台
+function needExternalForDownload(){
+  if(!inLine()) return false;
+  const url = location.origin + location.pathname + '#' + ui.atab;
+  openModal(`<div class="sheet-head"><h2>用瀏覽器開啟後台</h2><button class="close" data-close aria-label="關閉">×</button></div>
+    <div class="sec"><div class="callout info">💡<div><b>LINE 裡沒辦法下載檔案</b>按下面的按鈕，會用手機的瀏覽器（Safari／Chrome）打開後台，再按一次「下載 Excel」就可以了。第一次會請你用 LINE 帳號登入。</div></div></div>
+    <div class="sticky-cta"><div class="left"></div><button class="btn" data-openext="${esc(url)}">用瀏覽器開啟 ↗</button></div>`);
+  return true;
+}
 
 /* ---------- 連線 ---------- */
 // 所有讀寫都經過後端 API：後端會向 LINE 確認是本人，並檢查是否通過審核
@@ -630,7 +654,7 @@ function routeFromHash(){
 /* ---------- 關於出走社 ---------- */
 // 簡單排版：## 標題、- 項目、空行分段、網址自動變連結
 function formatText(t){
-  const link = (x)=>x.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
+  const link = (x)=>x.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener" data-ext>$1</a>');
   let html = '', para = [], inList = false;
   const flush = ()=>{ if(para.length){ html += `<p>${link(para.join('<br>'))}</p>`; para = []; } };
   const closeList = ()=>{ if(inList){ html += '</ul>'; inList = false; } };
@@ -797,7 +821,7 @@ function openDetail(id){
     + Array.from({length:slots},(_,k)=>`<li class="slot">${main.length+k+1}. 空位</li>`).join('');
   const waitList = ev.waitMax ? `<div class="wait-head">候補 ${wait.length} / ${ev.waitMax}</div>${wait.length ? `<ul class="roster">${wait.map((s,k)=>li(s, `候補 ${k+1}`, 'wait')).join('')}</ul>` : '<div class="sub">目前沒有候補</div>'}` : '';
 
-  const payBtn = ev.booking ? `<div style="margin-top:10px"><a class="btn sm" href="${esc(ev.booking)}" target="_blank" rel="noopener">前往預約付款 ↗</a></div>` : '';
+  const payBtn = ev.booking ? `<div style="margin-top:10px"><a class="btn sm" href="${esc(ev.booking)}" target="_blank" rel="noopener" data-ext>前往預約付款 ↗</a></div>` : '';
   let callout = '';
   if(i.flopped){
     callout = `<div class="callout warn">😢<div><b>這場活動已流標</b>沒有達到 ${ev.threshold} 人開班門檻，活動取消。${ev.cancelReason ? `<br>說明：${esc(ev.cancelReason)}` : ''}${mine ? '<br>如果你已經付款，管理員會另外聯繫你退款。' : ''}</div></div>`;
@@ -827,7 +851,7 @@ function openDetail(id){
 
   let cta;
   if(mine) cta = waiting ? `<div class="left"><b>⏳ 候補中</b>・${esc(myNick)}<br>需要取消請私訊管理員</div>`
-                         : `<div class="left"><b>✓ 已接龍</b>・${esc(myNick)}<br>需要取消請私訊管理員</div>${i.reached && ev.booking ? `<a class="btn" href="${esc(ev.booking)}" target="_blank" rel="noopener">預約付款 ↗</a>` : ''}`;
+                         : `<div class="left"><b>✓ 已接龍</b>・${esc(myNick)}<br>需要取消請私訊管理員</div>${i.reached && ev.booking ? `<a class="btn" href="${esc(ev.booking)}" target="_blank" rel="noopener" data-ext>預約付款 ↗</a>` : ''}`;
   else if(i.canJoin) cta = `<div class="left"><b>${money(ev.price)}</b> ${esc(ev.priceNote)}<br>${i.isWait ? `已滿團・候補剩 ${ev.capacity + ev.waitMax - i.total} 位` : `剩 ${i.left} 個名額`}</div><button class="btn" data-join="${ev.id}">${i.isWait ? '加入候補' : '+1 接龍'}</button>`;
   else if(i.flopped) cta = `<div class="left"><b>活動已流標</b><br>下次再一起出走 🙏</div>`;
   else if(i.ended) cta = `<div class="left"><b>活動已結束</b></div>`;
@@ -932,7 +956,7 @@ function renderAdmin(){
   $('#contentPanel').classList.toggle('hidden', tab!=='content');
   $('#eventsPanel').classList.toggle('hidden', tab!=='events');
   $('#newEvent').classList.toggle('hidden', tab!=='events');
-  $('#exportCsv').classList.toggle('hidden', tab!=='members');
+  $('#exportMembers').classList.toggle('hidden', tab!=='members');
   $('#exportXlsx').classList.toggle('hidden', tab!=='events');
   if(tab==='members') renderMembers(); else if(tab==='content') renderContentEditor(); else renderEvents();
 }
@@ -961,16 +985,21 @@ function renderMembers(){
   }).join('') : `<tr><td colspan="6" class="sub" style="text-align:center;padding:30px">沒有符合的人</td></tr>`;
 }
 
-function exportCsv(){
-  const head = ['社群暱稱','LINE 名稱','狀態','管理員','加入時間','接龍中場數'];
-  const rows = state.members.map(m=>[m.nickname, m.line_name||'', STATUS_LABEL[m.status], m.is_admin?'是':'', new Date(m.created_at).toLocaleString('zh-TW'), m.active_signups]);
-  const csv = [head, ...rows].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\r\n');
-  const blob = new Blob(['\ufeff' + csv], { type:'text/csv;charset=utf-8' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `agoodwayout_members_${todayKey}.csv`;   // 英文檔名：部分瀏覽器不支援中文下載檔名
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
+async function exportMembers(btn){
+  if(needExternalForDownload()) return;
+  btn.disabled = true;
+  try{
+    if(!window.XLSX) await loadScript(CONFIG.xlsxLib);
+    const rows = [['社群暱稱','LINE 名稱','狀態','管理員','加入時間','接龍中場數'],
+      ...state.members.map(m=>[m.nickname, m.line_name||'', STATUS_LABEL[m.status], m.is_admin?'是':'', new Date(m.created_at).toLocaleString('zh-TW', { hour12:false }), m.active_signups])];
+    const wb = XLSX.utils.book_new(), ws = XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols'] = [14,18,8,6,18,10].map(w=>({ wch:w }));
+    ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s:{r:0,c:0}, e:{r:rows.length-1, c:5} }) };
+    XLSX.utils.book_append_sheet(wb, ws, '人員清單');
+    XLSX.writeFile(wb, `agoodwayout_members_${todayKey}.xlsx`);   // 英文檔名：部分瀏覽器不支援中文下載檔名
+    toast(`已下載 ${state.members.length} 人`);
+  }catch(e){ toast(e.message==='script' ? 'Excel 元件載入失敗，請檢查網路後再試' : '下載失敗，請稍後再試'); }
+  btn.disabled = false;
 }
 
 function renderContentEditor(){
@@ -1230,7 +1259,7 @@ async function openRoster(id){
     openModal(`<div class="sheet-head"><h2>${esc(ev.title)}・名單</h2><button class="close" data-close aria-label="關閉">×</button>
       <div class="sub">${fmtDate(ev.date)} ${esc(ev.time)}・${i.status}</div>
       <div class="sub">正取 ${mainN}/${ev.capacity}・${ev.threshold} 人成團${ev.waitMax ? `・候補 ${waitN}/${ev.waitMax}` : ''}・已付款 <span id="paidN">${paidN}</span>/${mainN}</div>
-      ${ev.booking ? `<div class="sub" style="margin-top:4px">預約付款連結：<a href="${esc(ev.booking)}" target="_blank" rel="noopener">${esc(ev.booking)}</a></div>` : ''}</div>
+      ${ev.booking ? `<div class="sub" style="margin-top:4px">預約付款連結：<a href="${esc(ev.booking)}" target="_blank" rel="noopener" data-ext>${esc(ev.booking)}</a></div>` : ''}</div>
       <div class="sec">${roster.length ? `<ul class="contact-list">${roster.map(row).join('')}</ul>` : '<div class="sub">還沒有人接龍</div>'}</div>
       <div class="sec"><div class="callout info">💡<div>社員無法自行取消接龍，有人私訊要取消時，從這裡移除；正取有人移除時，候補會依序遞補。「LINE：」和備註只有管理員看得到。</div></div></div>`);
   }catch(e){
@@ -1340,6 +1369,7 @@ async function sendProposal(id, btn){
 
 /* ---------- 下載 Excel（活動總表＋接龍名單） ---------- */
 function openExport(){
+  if(needExternalForDownload()) return;
   const up = state.events.filter(e=>e.status==='open' && e.date >= todayKey).length;
   const all = state.events.filter(e=>e.status==='open').length;
   openModal(`<div class="sheet-head"><h2>下載 Excel</h2><button class="close" data-close aria-label="關閉">×</button>
@@ -1352,7 +1382,7 @@ function openExport(){
         </div>
         <div class="hint">「全部」是網站目前保留的範圍：近 180 天起的活動。待審核、已退回的自揪申請不會匯出。</div>
       </div>
-      <div class="callout warn">⚠️<div>檔案裡有社員的 LINE 名稱和備註，請只在自己的電腦使用、不要轉傳。在 LINE 裡開網頁可能無法下載，請改用電腦或手機瀏覽器。</div></div>
+      <div class="callout warn">⚠️<div>檔案裡有社員的 LINE 名稱和備註，請只在自己的電腦使用、不要轉傳。</div></div>
       <div class="err" id="xErr"></div>
     </div>
     <div class="sticky-cta"><div class="left"></div><button class="btn" data-doexport>⬇ 下載</button></div>`);
@@ -1419,7 +1449,7 @@ function closeModal(force){
 
 /* ---------- 事件 ---------- */
 document.addEventListener('click', async e=>{
-  const t = e.target.closest('[data-dodel],[data-flop],[data-doflop],[data-efilter],[data-review],[data-decide],[data-propose],[data-withdraw],[data-sendprop],[data-imgadd],[data-imgrm],[data-doexport],[data-paid],[data-copy],[data-adddate],[data-view],[data-mfilter],[data-mset],[data-madmin],[data-recheck],[data-day],[data-dayclear],[data-mode],[data-cat],[data-open],[data-close],[data-overlay],[data-join],[data-roster],[data-rm],[data-edit],[data-save],[data-del],[data-editnick],[data-savenick]');
+  const t = e.target.closest('[data-openext],[data-dodel],[data-flop],[data-doflop],[data-efilter],[data-review],[data-decide],[data-propose],[data-withdraw],[data-sendprop],[data-imgadd],[data-imgrm],[data-doexport],[data-paid],[data-copy],[data-adddate],[data-view],[data-mfilter],[data-mset],[data-madmin],[data-recheck],[data-day],[data-dayclear],[data-mode],[data-cat],[data-open],[data-close],[data-overlay],[data-join],[data-roster],[data-rm],[data-edit],[data-save],[data-del],[data-editnick],[data-savenick]');
   if(!t) return;
   const d = t.dataset;
   if(d.overlay!==undefined && e.target!==t) return;
@@ -1488,6 +1518,7 @@ document.addEventListener('click', async e=>{
   }
   else if(d.edit) openEdit(d.edit);
   else if(d.save!==undefined) saveEvent(d.save, t);
+  else if(d.openext){ openExternal(d.openext); closeModal(); }
   else if(d.del) openDelete(d.del);
   else if(d.dodel) doDelete(d.dodel, t);
   else if(d.flop) openFlop(d.flop);
@@ -1499,7 +1530,7 @@ $('#hideHowto').onclick = ()=>{ prefs.hideHowto=true; savePrefs(); renderMember(
 $('#prevM').onclick = ()=>{ let [y,m]=ui.ym; m--; if(m<0){m=11;y--;} ui.ym=[y,m]; ui.day=null; renderMember(); scrollToMonth(); };
 $('#nextM').onclick = ()=>{ let [y,m]=ui.ym; m++; if(m>11){m=0;y++;} ui.ym=[y,m]; ui.day=null; renderMember(); scrollToMonth(); };
 $('#newEvent').onclick = ()=>openEdit(null);
-$('#exportCsv').onclick = exportCsv;
+$('#exportMembers').onclick = (e)=>exportMembers(e.currentTarget);
 $('#exportXlsx').onclick = openExport;
 $('#newProposal').onclick = ()=>openEdit(null, null, true);
 $('#myProps').onclick = openMyProposals;

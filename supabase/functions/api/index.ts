@@ -256,6 +256,11 @@ function fmtWhen(a: { event_date: string; time_text: string | null }) {
 const evLink = (id: string) => `${LIFF_URL}?ev=${id}`;
 const twToday = () => new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 10);   // 台灣日期
 
+// LINE 訊息裡的付款連結加 openExternalBrowser=1：在 LINE 裡點開會改用手機預設瀏覽器
+function extUrl(u: string) {
+  try{ const x = new URL(u); x.searchParams.set('openExternalBrowser', '1'); return x.toString(); } catch { return u; }
+}
+
 const NOTIFY_FIELDS = "id, title, event_date, time_text, capacity, threshold, wait_max, price, price_note, booking_url, category, created_by, status";
 type NotifyAct = {
   id: string; title: string; event_date: string; time_text: string | null; capacity: number; threshold: number;
@@ -267,7 +272,7 @@ type NotifyAct = {
 function payText(a: NotifyAct) {
   const price = a.price ? `$${Number(a.price).toLocaleString("en-US")}${a.price_note ? `（${a.price_note}）` : ""}` : "免費";
   const how = a.booking_url
-    ? `請在活動前 7 天完成預約付款：\n${a.booking_url}`
+    ? `請在活動前 7 天完成預約付款：\n${extUrl(a.booking_url)}`
     : a.category === "member"
     ? "付款方式請留意揪團人在 LINE 社群的說明。"
     : "管理員會在 LINE 社群公告付款方式，請留意訊息。";
