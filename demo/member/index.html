@@ -840,7 +840,7 @@ function openDetail(id){
     callout = `<div class="callout warn">⏳<div><b>你在候補第 ${myIdx - ev.capacity + 1} 位</b>有人取消時會依序遞補，管理員會通知你。</div></div>`;
   } else if(mine && i.reached){
     callout = ev.booking
-      ? `<div class="callout go">🎉<div><b>已成團！請完成預約付款</b>報名以付款順序為準，最遲請在活動前 7 天完成，否則名額會釋出。${payBtn}</div></div>`
+      ? `<div class="callout go">🎉<div><b>已成團！請完成預約付款</b>最遲請在活動前 7 天完成，否則名額會釋出。${payBtn}</div></div>`
       : `<div class="callout go">🎉<div><b>已成團！</b>管理員會在 LINE 社群通知大家付款方式，請留意社群訊息。</div></div>`;
   } else if(mine){
     callout = `<div class="callout info">✓<div><b>你已接龍，還差 ${ev.threshold-i.n} 人成團</b>${ev.booking ? '成團後這裡會出現「前往預約付款」按鈕。' : '成團後管理員會在 LINE 社群通知付款方式。'}</div></div>`;
