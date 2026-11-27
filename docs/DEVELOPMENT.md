@@ -114,7 +114,7 @@
 - [x] 活動管理「下載 Excel」（SheetJS，按下才從 jsDelivr 載入）：活動總表＋接龍名單（2026-11-27）
 - [x] 手機版後台：寬表格只在框內左右滑，不再撐寬整頁
 - [x] LINE 通知第二輪（2026-11-28，定案表見 claude.ai Sheets「出走社 LINE 通知表」）：成團後接龍 → 本人付款通知；滿團 → 管理員；候補遞補 → 本人付款＋管理員對帳（名單標「遞補」、Excel 遞補時間）；流標（管理員按「流標」，活動保留顯示「已流標」）→ 所有接龍的人；刪除活動要填原因 → 所有接龍的人；已付款的人另外說明退款
-- [x] 每日排程（台灣 09:00）：活動前 7 天未成團提醒管理員「即將流標」（每場一次）、「今日待付款名單」給管理員（一天一次）。設定方式見 `supabase/cron/daily_notify.sql`
+- [x] 每日排程（台灣 09:00）：給管理員一則「每日提醒」，合併「⚠️ 即將流標」（活動前 7 天未成團，每場只列一次）和「💰 待付款」（已成團、未舉行活動中未勾已付款的正取）；兩段都沒有就不發，一天最多一則。設定方式見 `supabase/cron/daily_notify.sql`
 - [ ] 實機測試：自揪申請／審核、圖片上傳（iPhone、Android、LINE 內建瀏覽器）、LINE 通知、下載 Excel
 - [ ] 研究藍星的規定（上面都做完後再討論）
 - [ ] 從 LINE 社群對話紀錄新增活動（提案中，見下方）
@@ -136,7 +136,7 @@
 | `admin_review_activity` | 管理員 | `decision`＝`approve` / `reject`、`note`＝退回原因。只處理 `pending` 的申請（否則 `409 not_pending`），結果用 LINE 通知申請人 |
 | `admin_delete_activity` | 管理員 | 刪除活動。還沒舉行、有人接龍時要帶 `reason`（否則 `400 reason_required`），並用 LINE 通知所有接龍的人 |
 | `admin_cancel_activity` | 管理員 | 流標：`status` 改 `cancelled`（社員看得到「已流標」），`reason` 選填；通知所有接龍的人 |
-| `cron_daily` | 每日排程 | 不經 LINE 登入，header `x-cron-secret` 要等於 Edge Function Secret `CRON_SECRET`。即將流標提醒＋今日待付款名單 |
+| `cron_daily` | 每日排程 | 不經 LINE 登入，header `x-cron-secret` 要等於 Edge Function Secret `CRON_SECRET`。發一則「每日提醒」（即將流標＋待付款） |
 | `admin_export` | 管理員 | `activityIds` 陣列 → 這些活動的完整接龍名單（下載 Excel 用） |
 | `admin_roster` / `admin_remove_signup` / `admin_set_paid` | 管理員 | 看名單（含 LINE 名稱、方案、備註、已付款）、移除接龍、勾選已付款 |
 | `admin_save_about` | 管理員 | 儲存「關於出走社」內容（2 萬字內） |
@@ -151,7 +151,7 @@
 - **user ID 只在同一個 Provider 內通用**：現在 LINE Login 和官方帳號都在測試 Provider `出走社測試`，所以發得到。正式上線若改用正式官方帳號，LINE Login＋LIFF 也要搬到同一個 Provider（見上方「正式上線時」）。
 - 沒設定 `LINE_MESSAGING_TOKEN` 時不發通知，其他功能照常。
 - 不會通知的情況：一般接龍（未成團）、排進候補（網頁會顯示候補第幾位）、成團後又掉到門檻以下再補上（成團通知只發第一次）。
-- 社員自揪的活動：管理員收到的成團、滿團、候補遞補、即將流標，揪團人也會收到。
+- 揪團人不會收到管理員的通知（成團、滿團、遞補、即將流標、每日提醒都只發給管理員）；揪團人只收到自己申請的審核結果，以及自己接龍的活動的社員通知。
 
 ## 活動圖片的限制
 

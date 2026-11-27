@@ -274,12 +274,6 @@ function payText(a: NotifyAct) {
   return `費用：${price}\n${how}`;
 }
 
-// 管理員（社員自揪的活動再加揪團人）
-async function staffLineIds(a: { category: string; created_by: string | null }) {
-  const ids = await adminLineIds();
-  if (a.category === "member") ids.push((await lineIdOf(a.created_by)) ?? "");
-  return ids;
-}
 
 // 有效的接龍，依時間排序（前 capacity 位是正取，之後是候補）
 async function activeSignups(activityId: string) {
@@ -291,7 +285,7 @@ async function activeSignups(activityId: string) {
   );
 }
 
-// 人數達到開班門檻時發「成團通知」：正取的團員（請匯款）＋管理員（＋社員自揪的揪團人）。
+// 人數達到開班門檻時發「成團通知」：正取的團員（請匯款）＋管理員。
 // 用 reached_notified_at 鎖住，同一場只會發一次（兩人同時接龍、之後有人取消再補上都不會重發）。
 async function maybeNotifyReached(activityId: string): Promise<boolean> {
   if (!LINE_MESSAGING_TOKEN) return false;
@@ -312,15 +306,15 @@ async function maybeNotifyReached(activityId: string): Promise<boolean> {
     `🎉【成團通知】${a.title}\n${fmtWhen(a)}\n已達 ${a.threshold} 人開班門檻，活動確定舉行！\n${payText(a)}\n\n活動頁：${evLink(a.id)}`,
   );
   await pushLine(
-    await staffLineIds(a),
+    await adminLineIds(),
     `✅【成團】${a.title}\n${fmtWhen(a)}・目前 ${Math.min(list.length, a.capacity)}／${a.capacity} 人（門檻 ${a.threshold} 人）\n` +
       (a.booking_url ? "團員已收到預約付款通知。" : "這場沒有預約付款連結，請到 LINE 社群公告付款方式。") +
-      `\n每天早上會傳「今日待付款名單」給管理員。\n${evLink(a.id)}`,
+      `\n每天早上 9:00 的「每日提醒」會列出還沒付款的人。\n${evLink(a.id)}`,
   );
   return true;
 }
 
-// 名額剛好滿了：通知管理員（＋揪團人）一次，之後才開放候補
+// 名額剛好滿了：通知管理員一次，之後才開放候補
 async function maybeNotifyFull(activityId: string) {
   if (!LINE_MESSAGING_TOKEN) return;
   const { data: pre } = await db.from("activities").select("capacity, status, full_notified_at").eq("id", activityId).maybeSingle();
@@ -334,7 +328,7 @@ async function maybeNotifyFull(activityId: string) {
     .select(NOTIFY_FIELDS).maybeSingle<NotifyAct>();
   if (!a) return;
   await pushLine(
-    await staffLineIds(a),
+    await adminLineIds(),
     `📣【滿團】${a.title}\n${fmtWhen(a)}\n名額 ${a.capacity} 人已滿${a.wait_max ? `，接下來開放候補 ${a.wait_max} 位` : "（沒有開放候補）"}。\n想參加的人多，可以考慮加開一場。\n${evLink(a.id)}`,
   );
 }
@@ -371,60 +365,63 @@ async function notifyCancelled(a: NotifyAct, list: any[], head: string, reasonLi
   await pushLine(paid.map((s) => s.members?.line_user_id), `${base}\n\n你已付款的費用，管理員會另外聯繫你辦理退款。造成不便很抱歉。`);
 }
 
-// 每日排程：即將流標提醒＋今日待付款名單（台灣時間早上執行）
+// 每日排程（台灣時間早上 9:00）：把「即將流標」和「待付款」合成一則「每日提醒」發給管理員。
+// 兩段都沒有內容就不發；同一天只發一次（notify_log）。
+// 即將流標：活動前 FLOP_WARN_DAYS 天內還沒到開班門檻，每場只列一次（flop_warned_at）。
 async function runDaily() {
   const today = twToday();
-  const out = { flopWarned: 0, digestSent: false, unpaid: 0 };
+  const out = { flopWarned: 0, unpaid: 0, sent: false };
   if (!LINE_MESSAGING_TOKEN) return out;
+  const { error: dup } = await db.from("notify_log").insert({ key: `daily:${today}` });
+  if (dup) return out;   // 主鍵重複＝今天已經發過
+
   const acts = await fetchAll<any>(() =>
-    db.from("activities").select(`${NOTIFY_FIELDS}, reached_notified_at, flop_warned_at`)
+    db.from("activities").select(`${NOTIFY_FIELDS}, flop_warned_at`)
       .eq("status", "open").gte("event_date", today).order("event_date")
   );
-  const lists: Record<string, any[]> = {};
-  for (const a of acts) lists[a.id] = await activeSignups(a.id);
-
-  // 1. 即將流標：活動前 FLOP_WARN_DAYS 天內還沒到開班門檻，提醒管理員（＋揪團人）一次
   const limit = new Date(Date.parse(today + "T00:00:00Z") + FLOP_WARN_DAYS * 86400_000).toISOString().slice(0, 10);
+  const flopLines: string[] = [], payBlocks: string[] = [];
   for (const a of acts) {
-    const n = lists[a.id].length;
-    if (a.flop_warned_at || n >= a.threshold || a.event_date > limit) continue;
-    const { data: locked } = await db.from("activities").update({ flop_warned_at: new Date().toISOString() })
-      .eq("id", a.id).is("flop_warned_at", null).select("id").maybeSingle();
-    if (!locked) continue;
-    const days = Math.round((Date.parse(a.event_date) - Date.parse(today)) / 86400_000);
-    await pushLine(
-      await staffLineIds(a),
-      `⚠️【即將流標】${a.title}\n${fmtWhen(a)}（還有 ${days} 天）\n目前 ${n}／門檻 ${a.threshold} 人，還差 ${a.threshold - n} 人。\n` +
-        `要流標請到後台「活動管理」打開這場按「流標」，系統會通知接龍的人；想再等等就不用動作。\n${LIFF_URL}?page=events&ev=${a.id}`,
-    );
-    out.flopWarned++;
-  }
-
-  // 2. 今日待付款名單：已成團、還沒舉行的活動裡，正取但還沒勾「已付款」的人（一天只發一次）
-  const blocks: string[] = [];
-  for (const a of acts) {
-    const list = lists[a.id];
-    if (list.length < a.threshold) continue;
+    const list = await activeSignups(a.id);
+    if (list.length < a.threshold) {
+      if (a.flop_warned_at || a.event_date > limit) continue;
+      const { data: locked } = await db.from("activities").update({ flop_warned_at: new Date().toISOString() })
+        .eq("id", a.id).is("flop_warned_at", null).select("id").maybeSingle();
+      if (!locked) continue;
+      const days = Math.round((Date.parse(a.event_date) - Date.parse(today)) / 86400_000);
+      const line = `▸ ${fmtWhen(a)} ${a.title}\n　${list.length}／${a.threshold} 人，還差 ${a.threshold - list.length} 人（還有 ${days} 天）`;
+      flopLines.push(line);
+      out.flopWarned++;
+      continue;
+    }
     const due = list.slice(0, a.capacity).filter((s) => !s.paid);
     if (!due.length) continue;
     out.unpaid += due.length;
-    blocks.push(`▸ ${fmtWhen(a)} ${a.title}（${due.length} 人）\n` +
+    payBlocks.push(`▸ ${fmtWhen(a)} ${a.title}（${due.length} 人）\n` +
       due.map((s) => `　${s.members?.nickname ?? "?"}${s.members?.line_display_name ? `（LINE：${s.members.line_display_name}）` : ""}`).join("\n"));
   }
-  if (blocks.length) {
-    const { error } = await db.from("notify_log").insert({ key: `digest:${today}` });
-    if (!error) {   // 主鍵重複＝今天已經發過
-      let body = "";
-      for (const [i, b] of blocks.entries()) {
-        if ((body + b).length > 4000) { body += `\n…還有 ${blocks.length - i} 場，請到後台查看`; break; }
-        body += (body ? "\n\n" : "") + b;
-      }
-      const [, m, d] = today.split("-").map(Number);
-      await pushLine(await adminLineIds(),
-        `💰【今日待付款名單】${m}/${d}\n共 ${out.unpaid} 人還沒付款\n\n${body}\n\n收到款項後，請到後台名單勾「已付款」。\n${LIFF_URL}?page=events`);
-      out.digestSent = true;
+  if (!flopLines.length && !payBlocks.length) return out;
+
+  const fit = (blocks: string[], room: number) => {
+    let body = "";
+    for (const [i, b] of blocks.entries()) {
+      if ((body + b).length > room) return body + `\n…還有 ${blocks.length - i} 場，請到後台查看`;
+      body += (body ? "\n" : "") + b;
     }
+    return body;
+  };
+  const [, m, d] = today.split("-").map(Number);
+  const parts = [`☀️【出走社每日提醒】${m}/${d}`];
+  if (flopLines.length) {
+    parts.push(`⚠️ 即將流標（${flopLines.length} 場）\n${fit(flopLines, 1500)}\n要流標請到後台打開那場按「流標」，會通知接龍的人；想再等等就不用動作。`);
   }
+  if (payBlocks.length) {
+    parts.push(`💰 待付款（共 ${out.unpaid} 人）\n${fit(payBlocks, 2500)}\n收到款項後，請到後台名單勾「已付款」。`);
+  }
+  parts.push(`${LIFF_URL}?page=events`);
+  await pushLine(await adminLineIds(), parts.join("\n\n"));
+  out.sent = true;
+
   return out;
 }
 
@@ -769,7 +766,7 @@ async function handle(body: Record<string, unknown>) {
           pushLine([promoted.members?.line_user_id],
             `🎉【候補遞補成功】${a.title}\n${fmtWhen(a)}\n有人取消，你從候補遞補為正取！\n` +
               (reached ? `${payText(a)}\n\n活動頁：${evLink(a.id)}` : `成團後會再通知你付款。\n活動頁：${evLink(a.id)}`)),
-          staffLineIds(a).then((ids) => pushLine(ids,
+          adminLineIds().then((ids) => pushLine(ids,
             `🔁【候補遞補】${a.title}\n${fmtWhen(a)}\n${who} 從候補遞補為正取（補 ${removed.members?.nickname ?? "?"} 的位置）。\n` +
               (reached ? "已通知本人付款，收到款項後請到名單勾「已付款」。" : "還沒成團，成團時會一起通知付款。") + `\n${evLink(a.id)}`)),
         ]).catch((e) => console.error(e)));

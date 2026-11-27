@@ -1670,7 +1670,7 @@ boot();
     cronBtn.disabled = true;
     try{
       const r = await api('cron_daily');
-      toast(r.digestSent || r.flopWarned ? `已執行：${r.flopWarned ? `即將流標提醒 ${r.flopWarned} 場` : ''}${r.flopWarned && r.digestSent ? '、' : ''}${r.digestSent ? `待付款名單（${r.unpaid} 人）` : ''}，看「LINE 通知」` : '已執行：今天沒有要提醒的事');
+      toast(r.sent ? `已發出每日提醒（即將流標 ${r.flopWarned} 場、待付款 ${r.unpaid} 人），看「LINE 通知」` : '已執行：今天沒有要提醒的事，不發訊息');
     }catch(e){ toast('執行失敗：' + e.code); }
     cronBtn.disabled = false;
   };
