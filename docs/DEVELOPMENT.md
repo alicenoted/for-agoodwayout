@@ -135,7 +135,7 @@
 | `propose_activity` | 通過審核者 | 送出自揪申請（`activity`）；帶 `id`＝修改自己待審核／已退回的申請（退回的會重新送審）。新申請與退回後重送會通知管理員。錯誤：`too_many_pending`、`date_passed` |
 | `withdraw_proposal` | 通過審核者 | 撤回（刪除）自己待審核／已退回的申請 |
 | `admin_save_activity` | 管理員 | 新增、編輯活動；新增時可帶 `dates` 陣列，同一份內容一次建立多場 |
-| `admin_review_activity` | 管理員 | `decision`＝`approve` / `reject`、`note`＝退回原因。只處理 `pending` 的申請（否則 `409 not_pending`），結果用 LINE 通知申請人 |
+| `admin_review_activity` | 管理員 | `decision`＝`approve` / `reject`、`note`＝更改建議（退回時必填，否則 `400 note_required`；通過時選填，一起通知申請人）。管理員不直接改申請內容。只處理 `pending` 的申請（否則 `409 not_pending`），結果用 LINE 通知申請人 |
 | `admin_delete_activity` | 管理員 | 刪除活動。還沒舉行、有人接龍時要帶 `reason`（否則 `400 reason_required`），並用 LINE 通知所有接龍的人 |
 | `admin_cancel_activity` | 管理員 | 流標：`status` 改 `cancelled`（社員看得到「已流標」），`reason` 選填；通知所有接龍的人 |
 | `cron_daily` | 每日排程 | 不經 LINE 登入，header `x-cron-secret` 要等於 Edge Function Secret `CRON_SECRET`。發一則「每日提醒」（即將流標＋待付款） |

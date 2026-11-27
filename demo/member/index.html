@@ -1072,8 +1072,7 @@ function renderEvents(){
       <td style="min-width:150px">${review ? `<div class="sub">名額 ${ev.capacity}・${ev.threshold} 人成團</div>` : progress(ev,i)}</td>
       <td><span class="badge ${review ? (ev.status==='pending' ? 'review' : 'rejected') : i.cls}">${review ? REVIEW_LABEL[ev.status] : i.status}</span>${ev.status==='rejected' && ev.reviewNote ? `<div class="sub" style="margin-top:4px">${esc(ev.reviewNote)}</div>` : ''}${ev.status==='cancelled' && ev.cancelReason ? `<div class="sub" style="margin-top:4px">${esc(ev.cancelReason)}</div>` : ''}</td>
       <td><div class="actions">${review
-        ? `${ev.status==='pending' ? `<button class="btn sm" data-review="${ev.id}">審核</button>` : `<button class="btn ghost sm" data-review="${ev.id}">查看</button>`}
-           <button class="btn ghost sm" data-edit="${ev.id}">編輯</button>`
+        ? `${ev.status==='pending' ? `<button class="btn sm" data-review="${ev.id}">審核</button>` : `<button class="btn ghost sm" data-review="${ev.id}">查看</button>`}`
         : `<button class="btn ghost sm" data-roster="${ev.id}">名單</button>
            <button class="btn ghost sm" data-edit="${ev.id}">編輯</button>
            <button class="btn ghost sm" data-copy="${ev.id}" title="用這場的內容建立新活動">複製</button>`}
@@ -1172,26 +1171,24 @@ function openReview(id){
       ${galleryHtml(ev)}
     </div>
     ${ev.desc ? `<div class="sec"><h4>活動介紹</h4><div class="desc">${esc(ev.desc)}</div></div>` : ''}
-    ${ev.status==='rejected' ? `<div class="sec"><div class="reject-note"><b>退回原因：</b>${esc(ev.reviewNote || '（未填寫）')}</div><div class="sub" style="margin-top:8px">申請人修改後會重新出現在「待審核」。</div></div>` : ''}
+    ${ev.status==='rejected' ? `<div class="sec"><div class="reject-note"><b>更改建議：</b>${esc(ev.reviewNote || '（未填寫）')}</div><div class="sub" style="margin-top:8px">申請人修改後會重新出現在「待審核」。</div></div>` : ''}
     ${pending ? `<div class="sec">
-      <label class="field"><span>退回原因 <em>（退回時填寫，會用 LINE 通知申請人）</em></span>
-        <textarea class="input" id="rvNote" rows="2" maxlength="300" placeholder="例如：日期和社課撞期，請改到週日"></textarea></label>
-      <div class="hint" style="margin-top:0">需要調整內容（例如加上預約付款連結）可以先按「編輯」，存檔後再回來通過。</div>
+      <label class="field"><span>更改建議 <em>（退回時必填；通過時選填。會跟審核結果一起用 LINE 通知申請人）</em></span>
+        <textarea class="input" id="rvNote" rows="3" maxlength="300" placeholder="例如：日期和社課撞期，建議改到週日；集合地點請寫清楚出口"></textarea></label>
+      <div class="hint" style="margin-top:0">管理員不直接改申請內容。退回後由申請人照建議修改、重新送出；通過時的建議只是提醒，活動會照申請內容上架。</div>
       <div class="err" id="rvErr"></div>
     </div>` : ''}
-    <div class="sticky-cta">${pending
-      ? `<button class="btn danger" data-decide="${ev.id}|reject">退回</button><div class="left"></div><button class="btn ghost" data-edit="${ev.id}">編輯</button><button class="btn" data-decide="${ev.id}|approve">通過上架</button>`
-      : `<div class="left"></div><button class="btn ghost" data-edit="${ev.id}">編輯</button>`}</div>`);
+    ${pending ? `<div class="sticky-cta"><button class="btn danger" data-decide="${ev.id}|reject">退回</button><div class="left"></div><button class="btn" data-decide="${ev.id}|approve">通過</button></div>` : ''}`);
 }
 async function decide(id, decision, btn){
   const note = $('#rvNote') ? $('#rvNote').value.trim() : '';
-  if(decision==='reject' && !note){ $('#rvErr').textContent = '請填寫退回原因，讓申請人知道怎麼修改'; $('#rvNote').focus(); return; }
-  if(decision==='approve' && !confirm('通過後會立刻出現在社員的活動列表，並用 LINE 通知申請人。確定通過？')) return;
+  if(decision==='reject' && !note){ $('#rvErr').textContent = '退回時請填寫更改建議，讓申請人知道怎麼修改'; $('#rvNote').focus(); return; }
+  if(decision==='approve' && !confirm(`通過後會立刻出現在社員的活動列表，並用 LINE 通知申請人${note ? '（附上更改建議）' : ''}。確定通過？`)) return;
   btn.disabled = true;
   try{
     await api('admin_review_activity', { id, decision, note });
     await loadData(); closeModal(); render();
-    toast(decision==='approve' ? '已上架，並通知申請人' : '已退回，並通知申請人');
+    toast(decision==='approve' ? `已上架，並通知申請人${note ? '（附上更改建議）' : ''}` : '已退回，並把更改建議通知申請人');
   }catch(e){
     btn.disabled = false;
     if(e.status===401) return;
@@ -1211,7 +1208,7 @@ function openMyProposals(){
       : `<button class="btn ghost sm" data-propose="${ev.id}">${ev.status==='rejected' ? '修改後重新送出' : '修改'}</button><button class="btn danger sm" data-withdraw="${ev.id}">撤回</button>`;
     return `<li><div class="row">${st}<span class="t">${esc(ev.title)}</span></div>
       <div class="sub">${fmtDate(ev.date)} ${esc(ev.time)}・${money(ev.price)}・名額 ${ev.capacity}・${ev.threshold} 人成團</div>
-      ${ev.status==='rejected' && ev.reviewNote ? `<div class="reject-note"><b>管理員回覆：</b>${esc(ev.reviewNote)}</div>` : ''}
+      ${ev.reviewNote && ev.status!=='pending' ? `<div class="${ev.status==='rejected' ? 'reject-note' : 'callout info'}"><b>管理員的更改建議：</b>${esc(ev.reviewNote)}</div>` : ''}
       <div class="row">${acts}</div></li>`;
   };
   openModal(`<div class="sheet-head"><h2>我的自揪</h2><button class="close" data-close aria-label="關閉">×</button>
@@ -1315,7 +1312,7 @@ function openEdit(id, copyFrom, propose){
   const intro = propose
     ? `<div class="callout info" style="margin-top:8px">📝<div><b>送出後由管理員審核</b>通過後才會出現在活動列表，結果會用出走社官方帳號的 LINE 通知你（需先加好友）。</div></div>`
     : copyFrom ? '<div class="sub">已帶入原活動的內容，請選擇新的日期</div>'
-    : (id && ev.status!=='open') ? `<div class="sub">這是社員「${esc(ev.proposer)}」的自揪申請，存檔後狀態不變，請回到「審核」通過或退回。</div>` : '';
+    : (id && ev.status!=='open') ? `<div class="sub">這是社員「${esc(ev.proposer)}」的自揪申請，請到「審核」給更改建議，再退回或通過。</div>` : '';
   openModal(`<div class="sheet-head"><h2>${title}</h2><button class="close" data-close aria-label="關閉">×</button>${intro}</div>
     <form class="sec" id="evForm" onsubmit="return false">
       <div class="form-grid">
