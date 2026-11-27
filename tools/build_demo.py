@@ -148,7 +148,7 @@ def build(role):
     title = "出走社活動接龍（體驗・社員）" if role == "member" else "出走社管理員後台（體驗）"
     assert s.count("<title>出走社活動接龍</title>") == 1
     s = s.replace("<title>出走社活動接龍</title>", f"<title>{title}</title>")
-    css = DEMO_CSS + ("  #modeSwitch{display:none!important}\n" if role == "admin" else "")
+    css = DEMO_CSS   # 管理員頁保留「社員／管理員」切換：管理員本人也會看社員畫面
     assert s.count("</style>") == 1
     s = s.replace("</style>", css + "</style>")
     assert s.count("<body>\n") == 1
