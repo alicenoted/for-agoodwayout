@@ -46,7 +46,7 @@ def banner(role):
         name, link = "社員頁", '<a class="demo-link" href="../admin/" target="gwo-demo-admin">開啟管理員頁 ↗</a>'
     else:
         name, link = "管理員頁", '<a class="demo-link" href="../member/" target="gwo-demo-member">開啟社員頁 ↗</a>'
-    cron = '<button class="demo-btn" id="demoCron" title="正式網站每天早上 9:00 自動執行：即將流標提醒、今日待付款名單">⏰ 模擬每天早上 9:00</button>' if role == "admin" else ""
+    cron = '<button class="demo-btn" id="demoCron" title="正式網站每天早上 9:00 自動發一則「每日提醒」：即將流標＋待付款">⏰ 模擬每天早上 9:00</button>' if role == "admin" else ""
     return f"""<div class="demo-banner">
   <span class="demo-tag">體驗模式</span><b>{name}</b>
   <span>假資料只存在這台電腦，不會影響正式網站</span>
@@ -124,7 +124,7 @@ DEMO_SCRIPT = r"""<script>
     cronBtn.disabled = true;
     try{
       const r = await api('cron_daily');
-      toast(r.digestSent || r.flopWarned ? `已執行：${r.flopWarned ? `即將流標提醒 ${r.flopWarned} 場` : ''}${r.flopWarned && r.digestSent ? '、' : ''}${r.digestSent ? `待付款名單（${r.unpaid} 人）` : ''}，看「LINE 通知」` : '已執行：今天沒有要提醒的事');
+      toast(r.sent ? `已發出每日提醒（即將流標 ${r.flopWarned} 場、待付款 ${r.unpaid} 人），看「LINE 通知」` : '已執行：今天沒有要提醒的事，不發訊息');
     }catch(e){ toast('執行失敗：' + e.code); }
     cronBtn.disabled = false;
   };

@@ -127,7 +127,6 @@
       : '管理員會在 LINE 社群公告付款方式，請留意訊息。';
     return `費用：${price}\n${how}`;
   }
-  const staffIds = (db, a) => [...adminIds(db), ...(a.category === 'member' ? [a.created_by] : [])];
   const listOf = (db, id) => active(db).filter((s) => s.activity_id === id).sort((x, y) => x.created_at.localeCompare(y.created_at));
   function afterJoin(db, a, memberId) {
     const before = a.reached_notified_at;
@@ -139,7 +138,7 @@
     const n = listOf(db, a.id).length;
     if (!a.full_notified_at && n >= a.capacity) {
       a.full_notified_at = new Date().toISOString();
-      pushLine(db, staffIds(db, a), `📣【滿團】${a.title}\n${when(a)}\n名額 ${a.capacity} 人已滿${a.wait_max ? `，接下來開放候補 ${a.wait_max} 位` : '（沒有開放候補）'}。\n想參加的人多，可以考慮加開一場。\n${evLink(a.id)}`);
+      pushLine(db, adminIds(db), `📣【滿團】${a.title}\n${when(a)}\n名額 ${a.capacity} 人已滿${a.wait_max ? `，接下來開放候補 ${a.wait_max} 位` : '（沒有開放候補）'}。\n想參加的人多，可以考慮加開一場。\n${evLink(a.id)}`);
     }
   }
   function notifyCancelled(db, a, list, head, reasonLine) {
@@ -147,30 +146,34 @@
     list.forEach((s, i) => pushLine(db, [s.member_id], i < a.capacity && s.paid
       ? `${base}\n\n你已付款的費用，管理員會另外聯繫你辦理退款。造成不便很抱歉。` : `${base}\n\n謝謝你的接龍，下次見！`));
   }
+  // 每天早上 9:00：「即將流標」＋「待付款」合成一則「每日提醒」給管理員（對照正式後端 runDaily）
   function runDaily(db) {
     const today = todayTw(), limit = dayAfter(7);
     const acts = db.activities.filter((a) => a.status === 'open' && a.event_date >= today).sort((a, b) => a.event_date.localeCompare(b.event_date));
-    let warned = 0, unpaid = 0; const blocks = [];
+    let warned = 0, unpaid = 0; const flopLines = [], payBlocks = [];
     acts.forEach((a) => {
       const list = listOf(db, a.id);
-      if (!a.flop_warned_at && list.length < a.threshold && a.event_date <= limit) {
+      if (list.length < a.threshold) {
+        if (a.flop_warned_at || a.event_date > limit) return;
         a.flop_warned_at = new Date().toISOString(); warned++;
         const days = Math.round((new Date(a.event_date) - new Date(today)) / 86400000);
-        pushLine(db, staffIds(db, a), `⚠️【即將流標】${a.title}\n${when(a)}（還有 ${days} 天）\n目前 ${list.length}／門檻 ${a.threshold} 人，還差 ${a.threshold - list.length} 人。\n要流標請到後台「活動管理」打開這場按「流標」，系統會通知接龍的人；想再等等就不用動作。\n${LIFF_URL}?page=events&ev=${a.id}`);
+        const line = `▸ ${when(a)} ${a.title}\n　${list.length}／${a.threshold} 人，還差 ${a.threshold - list.length} 人（還有 ${days} 天）`;
+        flopLines.push(line);
+        return;
       }
-      if (list.length >= a.threshold) {
-        const due = list.slice(0, a.capacity).filter((s) => !s.paid);
-        if (due.length) {
-          unpaid += due.length;
-          blocks.push(`▸ ${when(a)} ${a.title}（${due.length} 人）\n` + due.map((s) => { const m = nickOf(db, s.member_id); return `　${m.nickname}${m.line_name ? `（LINE：${m.line_name}）` : ''}`; }).join('\n'));
-        }
-      }
+      const due = list.slice(0, a.capacity).filter((s) => !s.paid);
+      if (!due.length) return;
+      unpaid += due.length;
+      payBlocks.push(`▸ ${when(a)} ${a.title}（${due.length} 人）\n` + due.map((s) => { const m = nickOf(db, s.member_id); return `　${m.nickname}${m.line_name ? `（LINE：${m.line_name}）` : ''}`; }).join('\n'));
     });
-    if (blocks.length) {
-      const [, m, d] = today.split('-').map(Number);
-      pushLine(db, adminIds(db), `💰【今日待付款名單】${m}/${d}\n共 ${unpaid} 人還沒付款\n\n${blocks.join('\n\n')}\n\n收到款項後，請到後台名單勾「已付款」。\n${LIFF_URL}?page=events`);
-    }
-    return { flopWarned: warned, digestSent: blocks.length > 0, unpaid };
+    if (!flopLines.length && !payBlocks.length) return { flopWarned: 0, unpaid: 0, sent: false };
+    const [, m, d] = today.split('-').map(Number);
+    const parts = [`☀️【出走社每日提醒】${m}/${d}`];
+    if (flopLines.length) parts.push(`⚠️ 即將流標（${flopLines.length} 場）\n${flopLines.join('\n')}\n要流標請到後台打開那場按「流標」，會通知接龍的人；想再等等就不用動作。`);
+    if (payBlocks.length) parts.push(`💰 待付款（共 ${unpaid} 人）\n${payBlocks.join('\n')}\n收到款項後，請到後台名單勾「已付款」。`);
+    parts.push(`${LIFF_URL}?page=events`);
+    pushLine(db, adminIds(db), parts.join('\n\n'));
+    return { flopWarned: warned, unpaid, sent: true };
   }
 
   function maybeNotifyReached(db, a) {
@@ -183,11 +186,9 @@
       : '管理員會在 LINE 社群公告付款方式，請留意訊息。';
     pushLine(db, list.slice(0, a.capacity).map((s) => s.member_id),
       `🎉【成團通知】${a.title}\n${when(a)}\n已達 ${a.threshold} 人開班門檻，活動確定舉行！\n費用：${price}\n${pay}\n\n活動頁：${evLink(a.id)}`);
-    const staff = adminIds(db);
-    if (a.category === 'member') staff.push(a.created_by);
-    pushLine(db, staff,
+    pushLine(db, adminIds(db),
       `✅【成團】${a.title}\n${when(a)}・目前 ${list.length}／${a.capacity} 人（門檻 ${a.threshold} 人）\n` +
-      (a.booking_url ? '團員已收到預約付款通知。' : '這場沒有預約付款連結，請到 LINE 社群公告付款方式。') + `\n每天早上會傳「今日待付款名單」給管理員。\n${evLink(a.id)}`);
+      (a.booking_url ? '團員已收到預約付款通知。' : '這場沒有預約付款連結，請到 LINE 社群公告付款方式。') + `\n每天早上 9:00 的「每日提醒」會列出還沒付款的人。\n${evLink(a.id)}`);
   }
 
   // ---------- 規則（對照 supabase/functions/api/index.ts） ----------
@@ -463,7 +464,7 @@
             const reached = before.length - 1 >= a.threshold;
             const pm = nickOf(db, promoted.member_id), rm = nickOf(db, s.member_id);
             pushLine(db, [promoted.member_id], `🎉【候補遞補成功】${a.title}\n${when(a)}\n有人取消，你從候補遞補為正取！\n` + (reached ? `${payText(a)}\n\n活動頁：${evLink(a.id)}` : `成團後會再通知你付款。\n活動頁：${evLink(a.id)}`));
-            pushLine(db, staffIds(db, a), `🔁【候補遞補】${a.title}\n${when(a)}\n${pm.nickname}${pm.line_name ? `（LINE：${pm.line_name}）` : ''} 從候補遞補為正取（補 ${rm.nickname} 的位置）。\n` + (reached ? '已通知本人付款，收到款項後請到名單勾「已付款」。' : '還沒成團，成團時會一起通知付款。') + `\n${evLink(a.id)}`);
+            pushLine(db, adminIds(db), `🔁【候補遞補】${a.title}\n${when(a)}\n${pm.nickname}${pm.line_name ? `（LINE：${pm.line_name}）` : ''} 從候補遞補為正取（補 ${rm.nickname} 的位置）。\n` + (reached ? '已通知本人付款，收到款項後請到名單勾「已付款」。' : '還沒成團，成團時會一起通知付款。') + `\n${evLink(a.id)}`);
             result = { ok: true, promoted: pm.nickname };
           }
         }
