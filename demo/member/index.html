@@ -527,7 +527,7 @@ const TODAY = new Date();
 const todayKey = `${TODAY.getFullYear()}-${pad(TODAY.getMonth()+1)}-${pad(TODAY.getDate())}`;
 
 let state = { events: [], myProposals: [], me: null, mine: new Set(), idToken: null, members: [] };
-let ui = { mode:'member', cat:'all', ym:[TODAY.getFullYear(), TODAY.getMonth()], day:null, atab:'events', mfilter:'all', efilter:'open' };
+let ui = { mode:'member', cat:'all', ym:[TODAY.getFullYear(), TODAY.getMonth()], day:null, atab:'events', mfilter:'all', efilter:'all' };
 let prefs = { hideHowto:false, view:'list' };   // view：活動顯示方式，預設列表
 try{ prefs = { ...prefs, ...JSON.parse(localStorage.getItem('gwo-prefs') || '{}') }; }catch(e){}
 function savePrefs(){ try{ localStorage.setItem('gwo-prefs', JSON.stringify(prefs)); }catch(e){} }
@@ -1022,10 +1022,10 @@ async function saveAbout(btn){
 const REVIEW_LABEL = { pending:'待審核', rejected:'已退回' };
 function renderEvents(){
   const n = (st)=>state.events.filter(e=>e.status===st).length;
-  const filters = [['open','上架中',n('open')],['pending','待審核',n('pending')],['rejected','已退回',n('rejected')]];
+  const filters = [['all','全部',state.events.length],['open','上架中',n('open')],['pending','待審核',n('pending')],['rejected','已退回',n('rejected')]];
   $('#eventFilters').innerHTML = filters.map(([k,label,c])=>`<button class="tab ${ui.efilter===k?'on':''}" data-efilter="${k}">${label} ${k==='pending' && c ? `<span class="count-badge">${c}</span>` : `<span class="n">${c}</span>`}</button>`).join('');
-  const rows = state.events.filter(e=>e.status===ui.efilter).sort((a,b)=>a.date.localeCompare(b.date));
-  const emptyText = { open:'還沒有活動，按右上角「新增活動」', pending:'目前沒有待審核的自揪申請 🎉', rejected:'沒有退回的申請' }[ui.efilter];
+  const rows = state.events.filter(e=>ui.efilter==='all' || e.status===ui.efilter).sort((a,b)=>a.date.localeCompare(b.date));
+  const emptyText = { all:'還沒有活動，按右上角「新增活動」', open:'還沒有活動，按右上角「新增活動」', pending:'目前沒有待審核的自揪申請 🎉', rejected:'沒有退回的申請' }[ui.efilter];
   $('#adminRows').innerHTML = rows.length ? rows.map(ev=>{
     const i=info(ev), c=CATS[ev.cat];
     const review = ev.status !== 'open';
