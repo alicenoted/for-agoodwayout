@@ -113,9 +113,10 @@
     const wd = '日一二三四五六'[new Date(y, m - 1, d).getDay()];
     return `${m}/${d}（${wd}）${a.time_text ? ' ' + a.time_text : ''}`;
   }
+  let cronRun = false;   // 「模擬每天早上 9:00」執行中：發出的訊息標成排程訊息
   function pushLine(db, memberIds, text) {
     const at = new Date().toISOString();
-    [...new Set(memberIds.filter(Boolean))].forEach((to) => db.notices.push({ id: uid('n'), to, at, text }));
+    [...new Set(memberIds.filter(Boolean))].forEach((to) => db.notices.push({ id: uid('n'), to, at, text, ...(cronRun ? { cron: true } : {}) }));
   }
   const adminIds = (db) => db.members.filter((m) => m.is_admin && m.status === 'approved').map((m) => m.id);
   const evLink = (id) => `${LIFF_URL}?ev=${id}`;
@@ -435,7 +436,8 @@
 
       case 'cron_daily':
         requireAdmin(me);   // 體驗模式：管理員頁的「模擬每天早上 9:00」按鈕
-        result = runDaily(db);
+        cronRun = true;
+        try { result = runDaily(db); } finally { cronRun = false; }
         changed = true;
         break;
 
