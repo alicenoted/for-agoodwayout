@@ -68,6 +68,7 @@
         '從起針到收針，三小時織出圍巾的第一段。',
         { images: ['seed:knit'], wait_max: 2, options: '單堂體驗（$1,800）\n三堂套組（$1,600／堂）', booking_url: 'https://agoodwayout.simplybook.asia/' }),
       A('a-5', 'social', '月底聚餐｜麻辣鍋之夜',         '出走社',       14, '18:30',       '東區・麻辣鍋', 680, '含服務費 $50', 12, 6, '月底一起吃鍋聊天！新朋友非常歡迎。'),
+      A('a-8', 'host',   '陶藝體驗｜手捏小碗',         '陶藝老師 Ken', 4,  '10:00–12:00', '出走社社辦', 1200, '含燒製', 8, 4, '捏一個自己的小碗，燒好後寄給你。'),
       A('a-6', 'select', '植物染手帕工作坊',             '合作工作室 染日', 17, '13:30–16:30', '合作工作室・大稻埕', 1600, '含材料', 12, 6, '用洋蔥皮與薯榔染出暖色系手帕。'),
       // 一筆等待管理員審核的社員自揪
       A('a-7', 'member', '週日陽明山健行（擎天崗大草原）', '小美', 12, '09:00–14:00', '捷運劍潭站 2 號出口集合', 0, 'AA 制，公車自付', 8, 3,
@@ -81,20 +82,25 @@
       S('a-3', 'm-2', 900),  S('a-3', 'm-3', 800),
       S('a-4', 'm-1', 1000, { option: '單堂體驗（$1,800）', paid: true }), S('a-4', 'm-2', 950, { option: '三堂套組（$1,600／堂）' }),
       S('a-4', 'm-3', 900, { option: '單堂體驗（$1,800）' }), S('a-4', 'm-4', 850, { option: '單堂體驗（$1,800）' }),   // 已滿團，可排候補
+      S('a-8', 'm-3', 1100),                                                                            // 4 天後、只有 1 人：每日排程會提醒「即將流標」
       S('a-5', 'm-1', 700),  S('a-5', 'm-2', 600), S('a-5', 'm-3', 500), S('a-5', 'm-4', 400), S('a-5', 'm-admin', 300),
     ];
     // 已經成團的活動視為「已通知過」
-    activities.forEach((a) => { if (signups.filter((s) => s.activity_id === a.id).length >= a.threshold) a.reached_notified_at = iso(300); });
+    activities.forEach((a) => {
+      const n = signups.filter((s) => s.activity_id === a.id).length;
+      if (n >= a.threshold) a.reached_notified_at = iso(300);
+      if (n >= a.capacity) a.full_notified_at = iso(300);
+    });
     const about = '## 關於出走社\n這是體驗模式的示範內容，正式網站的內容由管理員在後台編輯。\n\n## 社群規範\n- 接龍就是承諾，成團後請準時付款\n- 臨時不能參加，請私訊管理員';
     const notices = [{
       id: uid('n'), to: 'm-admin', at: iso(90),
       text: `🙋【自揪申請待審核】週日陽明山健行（擎天崗大草原）\n${when(activities[6])}\n申請人：小美\n請到後台「活動管理 → 待審核」審核\n${LIFF_URL}?page=review`,
     }];
-    return { members, activities, signups, about, notices };
+    return { v: 2, members, activities, signups, about, notices };
   }
 
   function load() {
-    try { const raw = localStorage.getItem(KEY); if (raw) { const db = JSON.parse(raw); if (db.notices) return db; } } catch (e) {}
+    try { const raw = localStorage.getItem(KEY); if (raw) { const db = JSON.parse(raw); if (db.v === 2) return db; } } catch (e) {}
     const db = seed();   // 沒有資料，或是舊版體驗模式的資料 → 重新建立
     save(db);
     return db;
@@ -113,6 +119,59 @@
   }
   const adminIds = (db) => db.members.filter((m) => m.is_admin && m.status === 'approved').map((m) => m.id);
   const evLink = (id) => `${LIFF_URL}?ev=${id}`;
+  function payText(a) {
+    const price = a.price ? `$${Number(a.price).toLocaleString('en-US')}${a.price_note ? `（${a.price_note}）` : ''}` : '免費';
+    const how = a.booking_url ? `請在活動前 7 天完成預約付款（以付款順序為準）：\n${a.booking_url}`
+      : a.category === 'member' ? '付款方式請留意揪團人在 LINE 社群的說明。'
+      : '管理員會在 LINE 社群公告付款方式，請留意訊息。';
+    return `費用：${price}\n${how}`;
+  }
+  const staffIds = (db, a) => [...adminIds(db), ...(a.category === 'member' ? [a.created_by] : [])];
+  const listOf = (db, id) => active(db).filter((s) => s.activity_id === id).sort((x, y) => x.created_at.localeCompare(y.created_at));
+  function afterJoin(db, a, memberId) {
+    const before = a.reached_notified_at;
+    maybeNotifyReached(db, a);
+    if (before) {   // 已經成團後才接龍：通知這個人付款
+      const list = listOf(db, a.id), idx = list.findIndex((s) => s.member_id === memberId);
+      if (idx >= 0 && idx < a.capacity) pushLine(db, [memberId], `🎉【接龍成功・請付款】${a.title}\n${when(a)}\n這場已經成團，你是正取第 ${idx + 1} 位。\n${payText(a)}\n\n活動頁：${evLink(a.id)}`);
+    }
+    const n = listOf(db, a.id).length;
+    if (!a.full_notified_at && n >= a.capacity) {
+      a.full_notified_at = new Date().toISOString();
+      pushLine(db, staffIds(db, a), `📣【滿團】${a.title}\n${when(a)}\n名額 ${a.capacity} 人已滿${a.wait_max ? `，接下來開放候補 ${a.wait_max} 位` : '（沒有開放候補）'}。\n想參加的人多，可以考慮加開一場。\n${evLink(a.id)}`);
+    }
+  }
+  function notifyCancelled(db, a, list, head, reasonLine) {
+    const base = `${head}${a.title}\n${when(a)}\n${reasonLine}`;
+    list.forEach((s, i) => pushLine(db, [s.member_id], i < a.capacity && s.paid
+      ? `${base}\n\n你已付款的費用，管理員會另外聯繫你辦理退款。造成不便很抱歉。` : `${base}\n\n謝謝你的接龍，下次見！`));
+  }
+  function runDaily(db) {
+    const today = todayTw(), limit = dayAfter(7);
+    const acts = db.activities.filter((a) => a.status === 'open' && a.event_date >= today).sort((a, b) => a.event_date.localeCompare(b.event_date));
+    let warned = 0, unpaid = 0; const blocks = [];
+    acts.forEach((a) => {
+      const list = listOf(db, a.id);
+      if (!a.flop_warned_at && list.length < a.threshold && a.event_date <= limit) {
+        a.flop_warned_at = new Date().toISOString(); warned++;
+        const days = Math.round((new Date(a.event_date) - new Date(today)) / 86400000);
+        pushLine(db, staffIds(db, a), `⚠️【即將流標】${a.title}\n${when(a)}（還有 ${days} 天）\n目前 ${list.length}／門檻 ${a.threshold} 人，還差 ${a.threshold - list.length} 人。\n要流標請到後台「活動管理」打開這場按「流標」，系統會通知接龍的人；想再等等就不用動作。\n${LIFF_URL}?page=events&ev=${a.id}`);
+      }
+      if (list.length >= a.threshold) {
+        const due = list.slice(0, a.capacity).filter((s) => !s.paid);
+        if (due.length) {
+          unpaid += due.length;
+          blocks.push(`▸ ${when(a)} ${a.title}（${due.length} 人）\n` + due.map((s) => { const m = nickOf(db, s.member_id); return `　${m.nickname}${m.line_name ? `（LINE：${m.line_name}）` : ''}`; }).join('\n'));
+        }
+      }
+    });
+    if (blocks.length) {
+      const [, m, d] = today.split('-').map(Number);
+      pushLine(db, adminIds(db), `💰【今日待付款名單】${m}/${d}\n共 ${unpaid} 人還沒付款\n\n${blocks.join('\n\n')}\n\n收到款項後，請到後台名單勾「已付款」。\n${LIFF_URL}?page=events`);
+    }
+    return { flopWarned: warned, digestSent: blocks.length > 0, unpaid };
+  }
+
   function maybeNotifyReached(db, a) {
     const list = active(db).filter((s) => s.activity_id === a.id).sort((x, y) => x.created_at.localeCompare(y.created_at));
     if (a.status !== 'open' || a.reached_notified_at || list.length < a.threshold) return;
@@ -127,7 +186,7 @@
     if (a.category === 'member') staff.push(a.created_by);
     pushLine(db, staff,
       `✅【成團】${a.title}\n${when(a)}・目前 ${list.length}／${a.capacity} 人（門檻 ${a.threshold} 人）\n` +
-      (a.booking_url ? '團員已收到預約付款通知。' : '這場沒有預約付款連結，請到 LINE 社群公告付款方式。') + `\n${evLink(a.id)}`);
+      (a.booking_url ? '團員已收到預約付款通知。' : '這場沒有預約付款連結，請到 LINE 社群公告付款方式。') + `\n每天早上會傳「今日待付款名單」給管理員。\n${evLink(a.id)}`);
   }
 
   // ---------- 規則（對照 supabase/functions/api/index.ts） ----------
@@ -175,7 +234,7 @@
   function activityOut(db, a, viewer) {
     const own = a.created_by === viewer.id;
     const c = nickOf(db, a.created_by);
-    const { reached_notified_at, created_by, review_note, ...rest } = a;
+    const { reached_notified_at, full_notified_at, flop_warned_at, created_by, review_note, ...rest } = a;
     return {
       ...rest, mine_created: own,
       ...(viewer.is_admin || own ? { review_note } : { created_at: undefined }),
@@ -199,9 +258,9 @@
 
       case 'data': {
         requireApproved(me);
-        const st = me.is_admin ? ['open', 'pending', 'rejected'] : ['open'];
+        const st = me.is_admin ? ['open', 'cancelled', 'pending', 'rejected'] : ['open', 'cancelled'];
         const acts = db.activities.filter((a) => st.includes(a.status)).sort((a, b) => a.event_date.localeCompare(b.event_date) || a.created_at.localeCompare(b.created_at));
-        const ids = new Set(acts.filter((a) => a.status === 'open').map((a) => a.id));
+        const ids = new Set(acts.filter((a) => a.status === 'open' || a.status === 'cancelled').map((a) => a.id));
         result = {
           activities: acts.map((a) => activityOut(db, a, me)),
           myProposals: me.is_admin ? [] : db.activities.filter((a) => a.created_by === me.id && ['pending', 'rejected'].includes(a.status))
@@ -240,7 +299,7 @@
         db.signups.push({ id: uid('s'), activity_id: a.id, member_id: me.id, created_at: new Date().toISOString(), cancelled_at: null, option, note, paid: false });
         changed = true;
         if (list.length >= a.capacity) { result = { result: 'waitlist' }; break; }
-        maybeNotifyReached(db, a);
+        afterJoin(db, a, me.id);
         result = { result: list.length + 1 === a.threshold ? 'reached' : 'ok' };
         break;
       }
@@ -318,7 +377,7 @@
         result = {
           signups: active(db).filter((s) => ids.has(s.activity_id)).sort((a, b) => a.created_at.localeCompare(b.created_at)).map((s) => {
             const m = nickOf(db, s.member_id);
-            return { activity_id: s.activity_id, created_at: s.created_at, nickname: m.nickname, line_name: m.line_name, option: s.option, note: s.note, paid: s.paid };
+            return { activity_id: s.activity_id, created_at: s.created_at, nickname: m.nickname, line_name: m.line_name, option: s.option, note: s.note, paid: s.paid, promoted_at: s.promoted_at || null };
           }),
         };
         break;
@@ -347,28 +406,66 @@
       case 'admin_delete_activity': {
         requireAdmin(me);
         const old = db.activities.find((x) => x.id === body.id);
+        if (!old) throw new ApiError(404, 'not_found');
+        const list = listOf(db, old.id);
+        const reason = typeof body.reason === 'string' ? body.reason.trim().slice(0, 300) : '';
+        const notify = list.length > 0 && old.event_date >= todayTw() && old.status === 'open';
+        if (notify && !reason) throw new ApiError(400, 'reason_required');
+        if (notify) notifyCancelled(db, old, list, '❌【活動取消】', `原因：${reason}`);
         db.activities = db.activities.filter((x) => x.id !== body.id);
         db.signups = db.signups.filter((s) => s.activity_id !== body.id);
-        if (old) cleanupImages(db, old.images || []);
+        cleanupImages(db, old.images || []);
         changed = true;
-        result = { ok: true };
+        result = { ok: true, notified: notify ? list.length : 0 };
         break;
       }
+
+      case 'admin_cancel_activity': {
+        requireAdmin(me);
+        const a = db.activities.find((x) => x.id === body.id && x.status === 'open');
+        if (!a) throw new ApiError(409, 'not_open');
+        const reason = typeof body.reason === 'string' ? body.reason.trim().slice(0, 300) || null : null;
+        Object.assign(a, { status: 'cancelled', cancel_reason: reason, cancelled_at: new Date().toISOString() });
+        const list = listOf(db, a.id);
+        notifyCancelled(db, a, list, '😢【活動流標】', `很可惜沒有達到 ${a.threshold} 人開班門檻，這次活動取消。${reason ? `\n說明：${reason}` : ''}`);
+        changed = true;
+        result = { ok: true, notified: list.length };
+        break;
+      }
+
+      case 'cron_daily':
+        requireAdmin(me);   // 體驗模式：管理員頁的「模擬每天早上 9:00」按鈕
+        result = runDaily(db);
+        changed = true;
+        break;
 
       case 'admin_roster':
         requireAdmin(me);
         result = {
           roster: active(db).filter((s) => s.activity_id === body.activityId).sort((a, b) => a.created_at.localeCompare(b.created_at))
-            .map((s) => { const m = nickOf(db, s.member_id); return { id: s.id, created_at: s.created_at, nickname: m.nickname, line_name: m.line_name, option: s.option, note: s.note, paid: s.paid }; }),
+            .map((s) => { const m = nickOf(db, s.member_id); return { id: s.id, created_at: s.created_at, nickname: m.nickname, line_name: m.line_name, option: s.option, note: s.note, paid: s.paid, promoted_at: s.promoted_at || null }; }),
         };
         break;
 
       case 'admin_remove_signup': {
         requireAdmin(me);
         const s = db.signups.find((x) => x.id === body.signupId && !x.cancelled_at);
-        if (s) s.cancelled_at = new Date().toISOString();
-        changed = true;
         result = { ok: true };
+        if (s) {
+          const a = db.activities.find((x) => x.id === s.activity_id);
+          const before = listOf(db, s.activity_id), idx = before.indexOf(s);
+          s.cancelled_at = new Date().toISOString();
+          if (a && a.status === 'open' && idx < a.capacity && before.length > a.capacity) {
+            const promoted = before[a.capacity];
+            promoted.promoted_at = new Date().toISOString();
+            const reached = before.length - 1 >= a.threshold;
+            const pm = nickOf(db, promoted.member_id), rm = nickOf(db, s.member_id);
+            pushLine(db, [promoted.member_id], `🎉【候補遞補成功】${a.title}\n${when(a)}\n有人取消，你從候補遞補為正取！\n` + (reached ? `${payText(a)}\n\n活動頁：${evLink(a.id)}` : `成團後會再通知你付款。\n活動頁：${evLink(a.id)}`));
+            pushLine(db, staffIds(db, a), `🔁【候補遞補】${a.title}\n${when(a)}\n${pm.nickname}${pm.line_name ? `（LINE：${pm.line_name}）` : ''} 從候補遞補為正取（補 ${rm.nickname} 的位置）。\n` + (reached ? '已通知本人付款，收到款項後請到名單勾「已付款」。' : '還沒成團，成團時會一起通知付款。') + `\n${evLink(a.id)}`);
+            result = { ok: true, promoted: pm.nickname };
+          }
+        }
+        changed = true;
         break;
       }
 
